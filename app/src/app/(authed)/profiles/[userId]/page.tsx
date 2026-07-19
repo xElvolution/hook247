@@ -1,0 +1,228 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cache } from "react";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  CalendarDays,
+  Eye,
+  Flame,
+  MapPin,
+  Radio,
+  ShieldCheck,
+} from "lucide-react";
+import PublicProfileActions from "@/components/PublicProfileActions";
+import PublicProfileSections from "@/components/PublicProfileSections";
+import { db } from "@/lib/db";
+import { findDemoProfile, type PublicProfile } from "@/lib/demoProfiles";
+import { getSessionUserId } from "@/lib/session";
+import { ageFrom } from "@/lib/user";
+
+const ONLINE_WINDOW_MS = 30 * 60 * 1000;
+
+const getPublicProfile = cache(async (userId: string): Promise<{
+  profile: PublicProfile;
+  demoMode: boolean;
+} | null> => {
+  try {
+    const profile = await db.profile.findUnique({
+      where: { userId },
+      include: { services: { where: { enabled: true }, orderBy: { name: "asc" } } },
+    });
+    if (profile) {
+      return {
+        profile: {
+          userId: profile.userId,
+          displayName: profile.displayName,
+          age: ageFrom(profile.birthDate),
+          gender: profile.gender,
+          country: profile.country,
+          state: profile.state,
+          city: profile.city,
+          bio: profile.bio,
+          avatarUrl: profile.avatarUrl,
+          photos: profile.photos,
+          interests: profile.interests,
+          ethnicity: profile.ethnicity,
+          bodyBuild: profile.bodyBuild,
+          education: profile.education,
+          smoking: profile.smoking,
+          orientation: profile.orientation,
+          services: profile.services,
+          verified: profile.verified,
+          boosted: !!profile.boostedAt,
+          online: Date.now() - profile.lastActive.getTime() < ONLINE_WINDOW_MS,
+          availableToday: profile.availableToday,
+          live: profile.isLive,
+          profileViews: profile.profileViews,
+          joinedAt: profile.createdAt,
+        },
+        demoMode: false,
+      };
+    }
+  } catch {
+    // Demo profiles keep public browsing available before the database is connected.
+  }
+
+  const demoProfile = findDemoProfile(userId);
+  return demoProfile ? { profile: demoProfile, demoMode: true } : null;
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ userId: string }>;
+}): Promise<Metadata> {
+  const { userId } = await params;
+  const result = await getPublicProfile(userId);
+  if (!result) return { title: "Profile not found | Hook247" };
+
+  return {
+    title: `${result.profile.displayName}, ${result.profile.age} | Hook247`,
+    description: result.profile.bio || `View ${result.profile.displayName}'s public Hook247 profile.`,
+  };
+}
+
+function genderLabel(gender: PublicProfile["gender"]) {
+  if (gender === "FEMALE") return "Woman";
+  if (gender === "MALE") return "Man";
+  return "Non-binary";
+}
+
+export default async function PublicProfilePage({
+  params,
+}: {
+  params: Promise<{ userId: string }>;
+}) {
+  const { userId } = await params;
+  const result = await getPublicProfile(userId);
+  if (!result) notFound();
+
+  const sessionUserId = await getSessionUserId();
+  const profile = result.profile;
+  const gallery = Array.from(new Set([profile.avatarUrl, ...profile.photos].filter(Boolean)));
+  const timeline = [
+    ...(profile.availableToday
+      ? [{ title: "Available today", body: `${profile.displayName} is accepting enquiries today.`, date: "Today" }]
+      : []),
+    {
+      title: "Services updated",
+      body: profile.services.length
+        ? `${profile.services.length} services are currently published on this profile.`
+        : "No services have been published yet.",
+      date: "This week",
+    },
+    {
+      title: "Joined Hook247",
+      body: `${profile.displayName} became part of the Hook247 community.`,
+      date: profile.joinedAt.toLocaleDateString("en", { month: "short", year: "numeric" }),
+    },
+  ];
+  const reviews = result.demoMode
+    ? [
+        { author: "Maya", rating: 5, body: "Warm, punctual, and exactly as described. Communication was excellent.", date: "2 weeks ago" },
+        { author: "David", rating: 5, body: "A professional experience from the first message to the end of the booking.", date: "1 month ago" },
+        { author: "Tee", rating: 4, body: "Friendly, easy to arrange with, and very respectful of boundaries.", date: "2 months ago" },
+      ]
+    : [];
+  const details = [
+    { label: "Gender", value: genderLabel(profile.gender) },
+    { label: "Age", value: String(profile.age) },
+    { label: "Ethnicity", value: profile.ethnicity },
+    { label: "Build", value: profile.bodyBuild },
+    { label: "Orientation", value: profile.orientation },
+    { label: "Education", value: profile.education },
+    { label: "Smoking", value: profile.smoking },
+    { label: "Country", value: profile.country },
+    { label: "State", value: profile.state },
+    { label: "City / area", value: profile.city },
+  ];
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      <Link href="/" className="section-link mb-5">
+        <ArrowLeft className="h-4 w-4" /> Back to profiles
+      </Link>
+
+      <section className="public-profile-summary">
+        <div className="public-profile-summary-avatar">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={profile.avatarUrl} alt={profile.displayName} />
+          {(profile.online || profile.availableToday) && (
+            <span className="availability-badge">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              {profile.availableToday ? "Available today" : "Online now"}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-3xl font-extrabold md:text-4xl">
+              {profile.displayName}, {profile.age}
+            </h1>
+            {profile.verified && (
+              <BadgeCheck
+                className="h-6 w-6 shrink-0 fill-[#df3a6a] text-white"
+                aria-label="Verified profile"
+              />
+            )}
+          </div>
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
+            <MapPin className="h-4 w-4" />
+            {[profile.city, profile.state, profile.country].filter(Boolean).join(", ")}
+          </p>
+          <div className="mt-5 grid max-w-md grid-cols-3 gap-2">
+            <div className="public-profile-fact">
+              <CalendarDays className="h-4 w-4 text-[#df3a6a]" />
+              <span>
+                <small>Joined</small>
+                <strong>{profile.joinedAt.toLocaleDateString("en", { month: "short", year: "numeric" })}</strong>
+              </span>
+            </div>
+            <div className="public-profile-fact">
+              <ShieldCheck className="h-4 w-4 text-[#df3a6a]" />
+              <span>
+                <small>Profile</small>
+                <strong>{profile.verified ? "Verified" : "Standard"}</strong>
+              </span>
+            </div>
+            <div className="public-profile-fact">
+              <Eye className="h-4 w-4 text-[#df3a6a]" />
+              <span><small>Views</small><strong>{new Intl.NumberFormat("en-NG").format(profile.profileViews)}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="public-profile-summary-actions">
+          {profile.boosted && <span className="boost-badge"><Flame className="h-3 w-3 fill-current" /> Featured</span>}
+          {profile.live && (
+            <Link href={`/live/${encodeURIComponent(profile.userId)}`} className="btn-primary w-full text-sm">
+              <Radio className="h-4 w-4" /> Watch live
+            </Link>
+          )}
+          <PublicProfileActions
+            authed={!!sessionUserId}
+            demoMode={result.demoMode}
+            isMine={sessionUserId === profile.userId}
+            profileName={profile.displayName}
+            userId={profile.userId}
+          />
+        </div>
+      </section>
+
+      <PublicProfileSections
+        bio={profile.bio}
+        details={details}
+        gallery={gallery}
+        interests={profile.interests}
+        profileName={profile.displayName}
+        profileViews={profile.profileViews}
+        reviews={reviews}
+        services={profile.services}
+        timeline={timeline}
+      />
+    </div>
+  );
+}

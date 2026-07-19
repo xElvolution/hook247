@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NONBINARY
+}
+
+enum Plan {
+  FREE
+  PLUS
+  ELITE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  profile       Profile?
+  swipesGiven   Swipe[]   @relation("swiper")
+  swipesGotten  Swipe[]   @relation("swiped")
+  matchesA      Match[]   @relation("userA")
+  matchesB      Match[]   @relation("userB")
+  messages      Message[]
+  posts         Post[]
+  postLikes     PostLike[]
+  comments      Comment[]
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName    String
+  birthDate      DateTime
+  gender         Gender
+  lookingFor     Gender[]
+  bio            String   @default("")
+  country        String   @default("Nigeria")
+  state          String   @default("")
+  city           String   @default("")
+  ethnicity      String   @default("")
+  bodyBuild      String   @default("")
+  education      String   @default("")
+  smoking        String   @default("")
+  orientation    String   @default("")
+  interests      String[] @default([])
+  avatarUrl      String   @default("")
+  photos         String[] @default([])
+  verified       Boolean  @default(false)
+  availableToday Boolean  @default(false)
+  isLive         Boolean  @default(false)
+  profileViews   Int      @default(0)
+  plan           Plan     @default(FREE)
+  boostedAt      DateTime?
+  lastActive     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  services       ServiceOffer[]
+}
+
+model ServiceOffer {
+  id          String  @id @default(cuid())
+  profileId   String
+  profile     Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name        String
+  incallRate  Int?
+  outcallRate Int?
+  enabled     Boolean @default(true)
+
+  @@unique([profileId, name])
+  @@index([name, enabled])
+}
+
+model Swipe {
+  id        String   @id @default(cuid())
+  swiperId  String
+  swipedId  String
+  liked     Boolean
+  createdAt DateTime @default(now())
+
+  swiper User @relation("swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  swiped User @relation("swiped", fields: [swipedId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, swipedId])
+  @@index([swipedId, liked])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+
+  userA    User      @relation("userA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("userB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  matchId   String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  body      String
+  imageUrl  String   @default("")
+  videoUrl  String   @default("")
+  createdAt DateTime @default(now())
+
+  author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    PostLike[]
+  comments Comment[]
+
+  @@index([createdAt])
+}
+
+model PostLike {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
