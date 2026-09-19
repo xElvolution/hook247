@@ -2,47 +2,32 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import LiveStreamViewer, { type LiveHost } from "@/components/LiveStreamViewer";
 import { db } from "@/lib/db";
-import { findDemoProfile } from "@/lib/demoProfiles";
 import { getSessionUserId } from "@/lib/session";
 import { ageFrom } from "@/lib/user";
+import { VISIBLE_PROFILE } from "@/lib/moderation";
+import { isMockUserId, mockLiveHosts } from "@/lib/mock";
 
 async function getLiveHost(userId: string): Promise<LiveHost | null> {
-  try {
-    const profile = await db.profile.findUnique({
-      where: { userId },
-      include: { services: { where: { enabled: true }, take: 3 } },
-    });
-    if (profile?.isLive) {
-      return {
-        userId: profile.userId,
-        displayName: profile.displayName,
-        age: ageFrom(profile.birthDate),
-        city: profile.city,
-        state: profile.state,
-        avatarUrl: profile.avatarUrl,
-        bio: profile.bio,
-        interests: profile.interests,
-        services: profile.services.map((service) => service.name),
-        verified: profile.verified,
-      };
-    }
-  } catch {
-    // Demo live rooms remain available before the production database is connected.
+  if (isMockUserId(userId)) {
+    return mockLiveHosts().find((h) => h.userId === userId) ?? null;
   }
+  const profile = await db.profile.findFirst({
+    where: { AND: [VISIBLE_PROFILE, { userId }] },
+    include: { services: { where: { enabled: true }, take: 3 } },
+  });
+  if (!profile?.isLive) return null;
 
-  const demo = findDemoProfile(userId);
-  if (!demo?.live) return null;
   return {
-    userId: demo.userId,
-    displayName: demo.displayName,
-    age: demo.age,
-    city: demo.city,
-    state: demo.state,
-    avatarUrl: demo.avatarUrl,
-    bio: demo.bio,
-    interests: demo.interests,
-    services: demo.services.slice(0, 3).map((service) => service.name),
-    verified: demo.verified,
+    userId: profile.userId,
+    displayName: profile.displayName,
+    age: ageFrom(profile.birthDate),
+    city: profile.city,
+    state: profile.state,
+    avatarUrl: profile.avatarUrl,
+    bio: profile.bio,
+    interests: profile.interests,
+    services: profile.services.map((service) => service.name),
+    verified: profile.verified,
   };
 }
 

@@ -15,58 +15,53 @@ import {
 import PublicProfileActions from "@/components/PublicProfileActions";
 import PublicProfileSections from "@/components/PublicProfileSections";
 import { db } from "@/lib/db";
-import { findDemoProfile, type PublicProfile } from "@/lib/demoProfiles";
+import type { PublicProfile } from "@/lib/publicProfile";
 import { getSessionUserId } from "@/lib/session";
 import { ageFrom } from "@/lib/user";
+import { VISIBLE_PROFILE } from "@/lib/moderation";
+import { isMockUserId, mockPublicProfile } from "@/lib/mock";
 
 const ONLINE_WINDOW_MS = 30 * 60 * 1000;
 
-const getPublicProfile = cache(async (userId: string): Promise<{
-  profile: PublicProfile;
-  demoMode: boolean;
-} | null> => {
-  try {
-    const profile = await db.profile.findUnique({
-      where: { userId },
-      include: { services: { where: { enabled: true }, orderBy: { name: "asc" } } },
-    });
-    if (profile) {
-      return {
-        profile: {
-          userId: profile.userId,
-          displayName: profile.displayName,
-          age: ageFrom(profile.birthDate),
-          gender: profile.gender,
-          country: profile.country,
-          state: profile.state,
-          city: profile.city,
-          bio: profile.bio,
-          avatarUrl: profile.avatarUrl,
-          photos: profile.photos,
-          interests: profile.interests,
-          ethnicity: profile.ethnicity,
-          bodyBuild: profile.bodyBuild,
-          education: profile.education,
-          smoking: profile.smoking,
-          orientation: profile.orientation,
-          services: profile.services,
-          verified: profile.verified,
-          boosted: !!profile.boostedAt,
-          online: Date.now() - profile.lastActive.getTime() < ONLINE_WINDOW_MS,
-          availableToday: profile.availableToday,
-          live: profile.isLive,
-          profileViews: profile.profileViews,
-          joinedAt: profile.createdAt,
-        },
-        demoMode: false,
-      };
-    }
-  } catch {
-    // Demo profiles keep public browsing available before the database is connected.
+const getPublicProfile = cache(async (userId: string): Promise<PublicProfile | null> => {
+  if (isMockUserId(userId)) {
+    const mocked = mockPublicProfile(userId);
+    return mocked;
   }
+  // A banned account's profile 404s rather than rendering: the page is public,
+  // so it would otherwise stay reachable and indexable after the ban.
+  const profile = await db.profile.findFirst({
+    where: { AND: [VISIBLE_PROFILE, { userId }] },
+    include: { services: { where: { enabled: true }, orderBy: { name: "asc" } } },
+  });
+  if (!profile) return null;
 
-  const demoProfile = findDemoProfile(userId);
-  return demoProfile ? { profile: demoProfile, demoMode: true } : null;
+  return {
+    userId: profile.userId,
+    displayName: profile.displayName,
+    age: ageFrom(profile.birthDate),
+    gender: profile.gender,
+    country: profile.country,
+    state: profile.state,
+    city: profile.city,
+    bio: profile.bio,
+    avatarUrl: profile.avatarUrl,
+    photos: profile.photos,
+    interests: profile.interests,
+    ethnicity: profile.ethnicity,
+    bodyBuild: profile.bodyBuild,
+    education: profile.education,
+    smoking: profile.smoking,
+    orientation: profile.orientation,
+    services: profile.services,
+    verified: profile.verified,
+    boosted: !!profile.boostedAt,
+    online: Date.now() - profile.lastActive.getTime() < ONLINE_WINDOW_MS,
+    availableToday: profile.availableToday,
+    live: profile.isLive,
+    profileViews: profile.profileViews,
+    joinedAt: profile.createdAt,
+  };
 });
 
 export async function generateMetadata({
@@ -75,12 +70,12 @@ export async function generateMetadata({
   params: Promise<{ userId: string }>;
 }): Promise<Metadata> {
   const { userId } = await params;
-  const result = await getPublicProfile(userId);
-  if (!result) return { title: "Profile not found | Hook247" };
+  const profile = await getPublicProfile(userId);
+  if (!profile) return { title: "Profile not found | Hook247" };
 
   return {
-    title: `${result.profile.displayName}, ${result.profile.age} | Hook247`,
-    description: result.profile.bio || `View ${result.profile.displayName}'s public Hook247 profile.`,
+    title: `${profile.displayName}, ${profile.age} | Hook247`,
+    description: profile.bio || `View ${profile.displayName}'s public Hook247 profile.`,
   };
 }
 
@@ -96,11 +91,10 @@ export default async function PublicProfilePage({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
-  const result = await getPublicProfile(userId);
-  if (!result) notFound();
+  const profile = await getPublicProfile(userId);
+  if (!profile) notFound();
 
   const sessionUserId = await getSessionUserId();
-  const profile = result.profile;
   const gallery = Array.from(new Set([profile.avatarUrl, ...profile.photos].filter(Boolean)));
   const timeline = [
     ...(profile.availableToday
@@ -119,13 +113,7 @@ export default async function PublicProfilePage({
       date: profile.joinedAt.toLocaleDateString("en", { month: "short", year: "numeric" }),
     },
   ];
-  const reviews = result.demoMode
-    ? [
-        { author: "Maya", rating: 5, body: "Warm, punctual, and exactly as described. Communication was excellent.", date: "2 weeks ago" },
-        { author: "David", rating: 5, body: "A professional experience from the first message to the end of the booking.", date: "1 month ago" },
-        { author: "Tee", rating: 4, body: "Friendly, easy to arrange with, and very respectful of boundaries.", date: "2 months ago" },
-      ]
-    : [];
+  const reviews: Array<{ author: string; rating: number; body: string; date: string }> = [];
   const details = [
     { label: "Gender", value: genderLabel(profile.gender) },
     { label: "Age", value: String(profile.age) },
@@ -204,7 +192,6 @@ export default async function PublicProfilePage({
           )}
           <PublicProfileActions
             authed={!!sessionUserId}
-            demoMode={result.demoMode}
             isMine={sessionUserId === profile.userId}
             profileName={profile.displayName}
             userId={profile.userId}

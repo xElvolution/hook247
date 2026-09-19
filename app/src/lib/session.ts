@@ -1,9 +1,22 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "hook247-dev-secret"
-);
+// A known fallback secret means anyone can forge a session cookie, so in
+// production a missing AUTH_SECRET is a hard failure rather than a warning.
+const AUTH_SECRET = process.env.AUTH_SECRET ?? "";
+
+if (!AUTH_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "AUTH_SECRET is not set. Generate one with `openssl rand -base64 32`."
+  );
+}
+if (!AUTH_SECRET) {
+  console.warn(
+    "⚠️ AUTH_SECRET is not set — using an insecure development secret."
+  );
+}
+
+const secret = new TextEncoder().encode(AUTH_SECRET || "hook247-dev-secret");
 
 const COOKIE = "hook247_session";
 

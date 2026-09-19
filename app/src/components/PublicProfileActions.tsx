@@ -4,16 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Heart, MessageCircle, User } from "lucide-react";
+import ReportButton from "./ReportButton";
 
 export default function PublicProfileActions({
   authed,
-  demoMode,
   isMine,
   profileName,
   userId,
 }: {
   authed: boolean;
-  demoMode: boolean;
   isMine: boolean;
   profileName: string;
   userId: string;
@@ -52,11 +51,6 @@ export default function PublicProfileActions({
   }
 
   async function likeProfile() {
-    if (demoMode) {
-      setMessage("This preview profile cannot receive likes. Live profiles will work normally.");
-      return;
-    }
-
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/swipe", {
@@ -106,6 +100,14 @@ export default function PublicProfileActions({
           {message}
         </p>
       )}
+
+      <div className="mt-3 border-t border-line pt-3">
+        <ReportButton
+          targetType="USER"
+          targetId={userId}
+          label={`Report ${profileName}`}
+        />
+      </div>
     </div>
   );
 }

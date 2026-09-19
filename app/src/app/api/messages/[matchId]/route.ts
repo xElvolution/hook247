@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
+import { getActiveSessionUserId } from "@/lib/user";
+import { isMockUserId, mockSend, mockThread } from "@/lib/mock";
 
 async function assertMember(matchId: string, userId: string) {
   const match = await db.match.findUnique({ where: { id: matchId } });
@@ -17,6 +19,11 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { matchId } = await params;
+  if (isMockUserId(userId)) {
+    const thread = mockThread(matchId);
+    if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(thread);
+  }
   const match = await assertMember(matchId, userId);
   if (!match) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -52,16 +59,39 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ matchId: string }> }
 ) {
-  const userId = await getSessionUserId();
+  const userId = await getActiveSessionUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { matchId } = await params;
+  if (isMockUserId(userId)) {
+    const parsed = postSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const thread = mockThread(matchId);
+    if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(mockSend(matchId, parsed.data.body));
+  }
   const match = await assertMember(matchId, userId);
   if (!match) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const parsed = postSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  // Reading an existing thread stays open, but a banned counterpart cannot be
+  // written to — the conversation is effectively closed from both ends.
+  const otherId = match.userAId === userId ? match.userBId : match.userAId;
+  const other = await db.user.findFirst({
+    where: { id: otherId, bannedAt: null },
+    select: { id: true },
+  });
+  if (!other) {
+    return NextResponse.json(
+      { error: "This conversation is no longer available." },
+      { status: 403 }
+    );
   }
 
   const message = await db.message.create({

@@ -10,24 +10,61 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"real" | "demo" | false>(false);
+  const showDemo =
+    process.env.NEXT_PUBLIC_ALLOW_MOCK_LOGIN === "1" ||
+    process.env.NODE_ENV !== "production";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setBusy(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error ?? "Something went wrong.");
-      return;
+    setBusy("real");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        signal: AbortSignal.timeout(25000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          data.error ??
+            (res.status >= 500
+              ? "The server is waking up. Please try again."
+              : "Something went wrong.")
+        );
+        return;
+      }
+      router.push(data.hasProfile ? "/" : "/onboarding");
+      router.refresh();
+    } catch {
+      setError("Can't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    router.push(data.hasProfile ? "/" : "/onboarding");
+  }
+
+  async function demoLogin() {
+    setError("");
+    setBusy("demo");
+    try {
+      const res = await fetch("/api/auth/mock", {
+        method: "POST",
+        signal: AbortSignal.timeout(8000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Demo login is unavailable.");
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("Can't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -56,6 +93,14 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <div className="text-right">
+          <Link
+            href="/forgot-password"
+            className="text-xs text-muted hover:text-white"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         {error && (
           <p className="rounded-xl bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
@@ -63,10 +108,21 @@ export default function LoginPage() {
           </p>
         )}
 
-        <button type="submit" disabled={busy} className="btn-primary w-full">
-          {busy ? "Logging in…" : "Log in"}
+        <button type="submit" disabled={!!busy} className="btn-primary w-full">
+          {busy === "real" ? "Logging in…" : "Log in"}
         </button>
       </form>
+
+      {showDemo && (
+        <button
+          type="button"
+          disabled={!!busy}
+          onClick={demoLogin}
+          className="btn-ghost mt-3 w-full"
+        >
+          {busy === "demo" ? "Entering…" : "Continue as demo"}
+        </button>
+      )}
 
       <p className="mt-6 text-center text-sm text-muted">
         New here?{" "}

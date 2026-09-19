@@ -19,52 +19,126 @@ enum Plan {
   ELITE
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
+enum VerificationType {
+  SIGNUP
+  RESET
+}
 
-  profile       Profile?
-  swipesGiven   Swipe[]   @relation("swiper")
-  swipesGotten  Swipe[]   @relation("swiped")
-  matchesA      Match[]   @relation("userA")
-  matchesB      Match[]   @relation("userB")
-  messages      Message[]
-  posts         Post[]
-  postLikes     PostLike[]
-  comments      Comment[]
+enum PaymentPurpose {
+  PLAN_PLUS
+  PLAN_ELITE
+  BOOST
+  VERIFICATION
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  ABANDONED
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  NUDITY
+  UNDERAGE
+  SCAM
+  IMPERSONATION
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTarget {
+  USER
+  POST
+  COMMENT
+}
+
+/// Why a profile carries the verified badge. PAID is the legacy path where
+/// paying set the badge outright; REVIEWED means a human approved it; DOJAH
+/// means a real NIN + selfie-liveness KYC check passed via the Dojah widget.
+enum VerificationSource {
+  NONE
+  PAID
+  REVIEWED
+  DOJAH
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  /// Set when an admin bans the account. Non-null means the user cannot log in
+  /// and any existing session is rejected at the authed layout.
+  bannedAt       DateTime?
+  banReason      String    @default("")
+  /// Temporary suspension. Unlike a ban this lapses on its own.
+  suspendedUntil DateTime?
+
+  profile            Profile?
+  swipesGiven        Swipe[]             @relation("swiper")
+  swipesGotten       Swipe[]             @relation("swiped")
+  matchesA           Match[]             @relation("userA")
+  matchesB           Match[]             @relation("userB")
+  messages           Message[]
+  posts              Post[]
+  postLikes          PostLike[]
+  comments           Comment[]
+  emailVerifications EmailVerification[]
+  payments           Payment[]
+  reportsMade        Report[]            @relation("reporter")
+  reportsAgainst     Report[]            @relation("reportedUser")
+
+  @@index([bannedAt])
+  @@index([createdAt])
 }
 
 model Profile {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String             @id @default(cuid())
+  userId         String             @unique
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   displayName    String
   birthDate      DateTime
   gender         Gender
   lookingFor     Gender[]
-  bio            String   @default("")
-  country        String   @default("Nigeria")
-  state          String   @default("")
-  city           String   @default("")
-  ethnicity      String   @default("")
-  bodyBuild      String   @default("")
-  education      String   @default("")
-  smoking        String   @default("")
-  orientation    String   @default("")
-  interests      String[] @default([])
-  avatarUrl      String   @default("")
-  photos         String[] @default([])
-  verified       Boolean  @default(false)
-  availableToday Boolean  @default(false)
-  isLive         Boolean  @default(false)
-  profileViews   Int      @default(0)
-  plan           Plan     @default(FREE)
+  bio            String             @default("")
+  country        String             @default("Nigeria")
+  state          String             @default("")
+  city           String             @default("")
+  ethnicity      String             @default("")
+  bodyBuild      String             @default("")
+  education      String             @default("")
+  smoking        String             @default("")
+  orientation    String             @default("")
+  interests      String[]           @default([])
+  avatarUrl      String             @default("")
+  photos         String[]           @default([])
+  verified       Boolean            @default(false)
+  /// How the badge was granted, so the review queue can tell an unreviewed
+  /// paid badge from one a human actually approved.
+  verifiedSource VerificationSource @default(NONE)
+  verifiedAt     DateTime?
+  verifyNote     String             @default("")
+  availableToday Boolean            @default(false)
+  isLive         Boolean            @default(false)
+  profileViews   Int                @default(0)
+  plan           Plan               @default(FREE)
   boostedAt      DateTime?
-  lastActive     DateTime @default(now())
-  createdAt      DateTime @default(now())
+  lastActive     DateTime           @default(now())
+  createdAt      DateTime           @default(now())
   services       ServiceOffer[]
+
+  @@index([verifiedSource])
 }
 
 model ServiceOffer {
@@ -121,18 +195,23 @@ model Message {
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  authorId  String
-  body      String
-  imageUrl  String   @default("")
-  videoUrl  String   @default("")
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  authorId   String
+  body       String
+  imageUrl   String    @default("")
+  videoUrl   String    @default("")
+  createdAt  DateTime  @default(now())
+  /// Set by an admin takedown. Hidden posts stay in the table for the audit
+  /// trail but are filtered out of the feed.
+  hiddenAt   DateTime?
+  hideReason String    @default("")
 
   author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes    PostLike[]
   comments Comment[]
 
   @@index([createdAt])
+  @@index([hiddenAt])
 }
 
 model PostLike {
@@ -147,14 +226,89 @@ model PostLike {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   postId    String
   authorId  String
   body      String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  hiddenAt  DateTime?
 
   post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt])
+}
+
+/// Six-digit codes for signup confirmation and password reset. Rows are kept
+/// after use so a code can never be replayed; cleanup is by expiresAt.
+model EmailVerification {
+  id        String           @id @default(cuid())
+  userId    String
+  email     String
+  code      String
+  type      VerificationType @default(SIGNUP)
+  verified  Boolean          @default(false)
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, code, type])
+  @@index([expiresAt])
+}
+
+/// One row per Paystack checkout. `reference` is what we send to Paystack and
+/// what the webhook echoes back, so it is the idempotency key for fulfilment.
+model Payment {
+  id          String         @id @default(cuid())
+  userId      String
+  reference   String         @unique
+  purpose     PaymentPurpose
+  amountKobo  Int
+  status      PaymentStatus  @default(PENDING)
+  fulfilledAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+/// A user-submitted report. `targetType` says which of the target columns is
+/// meaningful; the others stay null.
+model Report {
+  id              String       @id @default(cuid())
+  reporterId      String
+  targetType      ReportTarget
+  targetUserId    String?
+  targetPostId    String?
+  targetCommentId String?
+  reason          ReportReason
+  details         String       @default("")
+  status          ReportStatus @default(OPEN)
+  resolution      String       @default("")
+  createdAt       DateTime     @default(now())
+  resolvedAt      DateTime?
+
+  reporter     User  @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User? @relation("reportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  // One open report per reporter per target: re-reporting the same profile
+  // shouldn't flood the queue, but a resolved report can be followed by a new one.
+  @@index([status, createdAt])
+  @@index([targetUserId])
+}
+
+/// Append-only audit log of everything done from the admin console. Nothing
+/// here is ever updated or deleted — it is the record of who did what.
+model AdminAction {
+  id         String   @id @default(cuid())
+  action     String
+  targetType String
+  targetId   String
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
 }

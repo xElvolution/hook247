@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { getSessionUserId } from "@/lib/session";
+import { getActiveSessionUserId } from "@/lib/user";
 
 const FILE_TYPES: Record<string, { extension: string; kind: "image" | "video" }> = {
   "image/jpeg": { extension: "jpg", kind: "image" },
@@ -17,7 +17,7 @@ const FILE_TYPES: Record<string, { extension: string; kind: "image" | "video" }>
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const userId = await getSessionUserId();
+  const userId = await getActiveSessionUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const formData = await request.formData();

@@ -22,18 +22,39 @@ export default function SignupPage() {
       return;
     }
     setBusy(true);
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, birthDate }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error ?? "Something went wrong.");
-      return;
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, birthDate }),
+        signal: AbortSignal.timeout(25000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          data.error ??
+            (res.status >= 500
+              ? "The server is waking up. Please try again."
+              : "Something went wrong.")
+        );
+        return;
+      }
+      // The account exists and is signed in either way. If the code could not be
+      // sent, say so rather than dropping the user at a code prompt with no code.
+      if (data.emailSent === false) {
+        setError(
+          data.message ??
+            "Account created, but we could not email your code. You can resend it from the verification page."
+        );
+        return;
+      }
+      router.push(`/onboarding?birth=${encodeURIComponent(birthDate)}`);
+      router.refresh();
+    } catch {
+      setError("Can't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    router.push(`/onboarding?birth=${encodeURIComponent(birthDate)}`);
   }
 
   return (

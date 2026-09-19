@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
 import { ageFrom } from "@/lib/user";
+import { isMockUserId, mockMatches } from "@/lib/mock";
 
 export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (isMockUserId(userId)) return NextResponse.json(mockMatches());
 
   const matches = await db.match.findMany({
     where: { OR: [{ userAId: userId }, { userBId: userId }] },

@@ -156,37 +156,45 @@ function ProfileSetup() {
     }
     setBusy(true);
     setError("");
-    const response = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: displayName.trim(),
-        birthDate,
-        gender,
-        lookingFor,
-        bio,
-        country,
-        state,
-        city,
-        ethnicity,
-        bodyBuild,
-        education,
-        smoking,
-        orientation,
-        availableToday,
-        interests,
-        avatarUrl: existingAvatarUrl || avatarUrl(avatarStyle),
-        services,
-      }),
-    });
-    const data = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(data.error ?? "The profile could not be saved.");
-      return;
+    try {
+      const response = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: displayName.trim(),
+          birthDate,
+          gender,
+          lookingFor,
+          bio,
+          country,
+          state,
+          city,
+          ethnicity,
+          bodyBuild,
+          education,
+          smoking,
+          orientation,
+          availableToday,
+          interests,
+          avatarUrl: existingAvatarUrl || avatarUrl(avatarStyle),
+          services,
+        }),
+        signal: AbortSignal.timeout(25000),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error ?? "The profile could not be saved.");
+        return;
+      }
+      // New members confirm their address before landing in the app; editors are
+      // already verified and go straight back to their profile.
+      router.push(editing ? "/profile" : "/verify-email");
+      router.refresh();
+    } catch {
+      setError("Can't reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    router.push(editing ? "/profile" : "/discover");
-    router.refresh();
   }
 
   const panels = [

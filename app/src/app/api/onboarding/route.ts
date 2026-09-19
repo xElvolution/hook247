@@ -12,7 +12,7 @@ import {
   statesFor,
 } from "@/lib/profileOptions";
 import { getSessionUserId } from "@/lib/session";
-import { ageFrom } from "@/lib/user";
+import { ageFrom, getActiveSessionUserId } from "@/lib/user";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -76,7 +76,7 @@ const schema = z
   });
 
 export async function POST(req: Request) {
-  const userId = await getSessionUserId();
+  const userId = await getActiveSessionUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
