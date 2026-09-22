@@ -6,12 +6,20 @@ import { failFrom } from "@/lib/http";
 import { createSession } from "@/lib/session";
 import { ageFrom } from "@/lib/user";
 import { issueCode } from "@/lib/verification";
+import { resolveReferrerId, uniqueReferralCode } from "@/lib/referrals";
 
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  birthDate: z.string().refine((s) => !isNaN(Date.parse(s)), "Invalid date"),
-});
+const schema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(8, "Confirm your password"),
+    birthDate: z.string().refine((s) => !isNaN(Date.parse(s)), "Invalid date"),
+    referralCode: z.string().max(16).optional(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export async function POST(req: Request) {
   try {
@@ -22,11 +30,11 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { email, password, birthDate } = parsed.data;
+    const { email, password, birthDate, referralCode } = parsed.data;
 
     if (ageFrom(new Date(birthDate)) < 18) {
       return NextResponse.json(
-        { error: "You must be 18 or older to join Hook247." },
+        { error: "You must be 18 or older to join Hooks247." },
         { status: 403 }
       );
     }
@@ -40,8 +48,14 @@ export async function POST(req: Request) {
       );
     }
 
+    const referredById = await resolveReferrerId(referralCode);
     const user = await db.user.create({
-      data: { email: address, passwordHash: await bcrypt.hash(password, 10) },
+      data: {
+        email: address,
+        passwordHash: await bcrypt.hash(password, 10),
+        referralCode: await uniqueReferralCode(),
+        referredById: referredById === null ? undefined : referredById,
+      },
     });
 
     // The session starts here so onboarding can continue immediately; the code

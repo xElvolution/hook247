@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import PublicProfileActions from "@/components/PublicProfileActions";
 import PublicProfileSections from "@/components/PublicProfileSections";
+import ProfileHeroCarousel from "@/components/ProfileHeroCarousel";
 import { db } from "@/lib/db";
 import type { PublicProfile } from "@/lib/publicProfile";
 import { getSessionUserId } from "@/lib/session";
@@ -47,9 +48,13 @@ const getPublicProfile = cache(async (userId: string): Promise<PublicProfile | n
     bio: profile.bio,
     avatarUrl: profile.avatarUrl,
     photos: profile.photos,
+    clips: profile.clips,
+    whatsapp: profile.whatsapp,
     interests: profile.interests,
     ethnicity: profile.ethnicity,
     bodyBuild: profile.bodyBuild,
+    bustSize: profile.bustSize,
+    thighs: profile.thighs,
     education: profile.education,
     smoking: profile.smoking,
     orientation: profile.orientation,
@@ -95,7 +100,9 @@ export default async function PublicProfilePage({
   if (!profile) notFound();
 
   const sessionUserId = await getSessionUserId();
-  const gallery = Array.from(new Set([profile.avatarUrl, ...profile.photos].filter(Boolean)));
+  const gallery = Array.from(
+    new Set([profile.avatarUrl, ...profile.photos, ...profile.clips].filter(Boolean))
+  );
   const timeline = [
     ...(profile.availableToday
       ? [{ title: "Available today", body: `${profile.displayName} is accepting enquiries today.`, date: "Today" }]
@@ -119,6 +126,8 @@ export default async function PublicProfilePage({
     { label: "Age", value: String(profile.age) },
     { label: "Ethnicity", value: profile.ethnicity },
     { label: "Build", value: profile.bodyBuild },
+    { label: "Bust size", value: profile.bustSize },
+    { label: "Thighs", value: profile.thighs },
     { label: "Orientation", value: profile.orientation },
     { label: "Education", value: profile.education },
     { label: "Smoking", value: profile.smoking },
@@ -133,26 +142,23 @@ export default async function PublicProfilePage({
         <ArrowLeft className="h-4 w-4" /> Back to profiles
       </Link>
 
-      <section className="public-profile-summary">
-        <div className="public-profile-summary-avatar">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={profile.avatarUrl} alt={profile.displayName} />
-          {(profile.online || profile.availableToday) && (
-            <span className="availability-badge">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-              {profile.availableToday ? "Available today" : "Online now"}
-            </span>
-          )}
-        </div>
+      <ProfileHeroCarousel
+        items={gallery.length ? gallery : [profile.avatarUrl]}
+        name={profile.displayName}
+        availableLabel={
+          profile.availableToday ? "Available today" : profile.online ? "Online now" : undefined
+        }
+      />
 
+      <section className="public-profile-summary public-profile-summary-body">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="font-display text-3xl font-extrabold md:text-4xl">
+            <h1 className="font-display text-2xl font-extrabold md:text-3xl">
               {profile.displayName}, {profile.age}
             </h1>
             {profile.verified && (
               <BadgeCheck
-                className="h-6 w-6 shrink-0 fill-[#df3a6a] text-white"
+                className="h-5 w-5 shrink-0 fill-[#df3a6a] text-white"
                 aria-label="Verified profile"
               />
             )}
@@ -161,7 +167,7 @@ export default async function PublicProfilePage({
             <MapPin className="h-4 w-4" />
             {[profile.city, profile.state, profile.country].filter(Boolean).join(", ")}
           </p>
-          <div className="mt-5 grid max-w-md grid-cols-3 gap-2">
+          <div className="public-profile-facts mt-5">
             <div className="public-profile-fact">
               <CalendarDays className="h-4 w-4 text-[#df3a6a]" />
               <span>
@@ -195,6 +201,8 @@ export default async function PublicProfilePage({
             isMine={sessionUserId === profile.userId}
             profileName={profile.displayName}
             userId={profile.userId}
+            whatsapp={profile.whatsapp}
+            country={profile.country}
           />
         </div>
       </section>
@@ -209,6 +217,9 @@ export default async function PublicProfilePage({
         reviews={reviews}
         services={profile.services}
         timeline={timeline}
+        listingUserId={profile.userId}
+        authed={!!sessionUserId}
+        isMine={sessionUserId === profile.userId}
       />
     </div>
   );

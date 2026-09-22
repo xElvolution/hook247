@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import AuthShell from "@/components/AuthShell";
+import PasswordField from "@/components/PasswordField";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -129,14 +130,13 @@ export default function ForgotPasswordPage() {
               The code expires in 10 minutes.
             </p>
           </div>
-          <input
-            type="password"
+          <PasswordField
             required
             minLength={8}
             placeholder="New password (8+ characters)"
-            className="input"
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
+            onChange={setNewPassword}
+            autoComplete="new-password"
           />
 
           {error && (

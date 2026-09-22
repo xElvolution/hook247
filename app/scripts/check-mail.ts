@@ -85,11 +85,11 @@ async function main() {
 
   try {
     const info = await transporter.sendMail({
-      from: `"Hook247" <${from}>`,
+      from: `"Hooks247" <${from}>`,
       to,
-      subject: "Hook247 SMTP test",
-      text: "If you are reading this, Hook247 can send email.",
-      html: '<p style="font-family:sans-serif">If you are reading this, Hook247 can send email.</p>',
+      subject: "Hooks247 SMTP test",
+      text: "If you are reading this, Hooks247 can send email.",
+      html: '<p style="font-family:sans-serif">If you are reading this, Hooks247 can send email.</p>',
     });
     console.log(`✓ Accepted for delivery — ${info.messageId}`);
     console.log("\n  Check the inbox, and the spam folder. Landing in spam means the");

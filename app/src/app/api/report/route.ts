@@ -106,6 +106,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     duplicate: false,
-    message: "Thanks — our team will review this.",
+    message: "Thanks. Our team will review this.",
   });
 }

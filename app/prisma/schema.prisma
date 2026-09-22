@@ -19,6 +19,11 @@ enum Plan {
   ELITE
 }
 
+enum AccountRole {
+  ESCORT
+  CLIENT
+}
+
 enum VerificationType {
   SIGNUP
   RESET
@@ -29,6 +34,21 @@ enum PaymentPurpose {
   PLAN_ELITE
   BOOST
   VERIFICATION
+  SUBSCRIPTION
+}
+
+enum CommissionStatus {
+  PENDING
+  AVAILABLE
+  PAID
+  VOID
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PAID
 }
 
 enum PaymentStatus {
@@ -85,6 +105,14 @@ model User {
   /// Temporary suspension. Unlike a ban this lapses on its own.
   suspendedUntil DateTime?
 
+  /// Shareable code for /signup?ref=CODE. Generated at signup.
+  referralCode String  @unique
+  referredById String?
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]  @relation("Referrals")
+  referralEarnings ReferralEarning[]
+  withdrawals        Withdrawal[]
+
   profile            Profile?
   swipesGiven        Swipe[]             @relation("swiper")
   swipesGotten       Swipe[]             @relation("swiped")
@@ -98,9 +126,11 @@ model User {
   payments           Payment[]
   reportsMade        Report[]            @relation("reporter")
   reportsAgainst     Report[]            @relation("reportedUser")
+  reviewsWritten     ListingReview[]     @relation("reviewAuthor")
 
   @@index([bannedAt])
   @@index([createdAt])
+  @@index([referredById])
 }
 
 model Profile {
@@ -117,12 +147,18 @@ model Profile {
   city           String             @default("")
   ethnicity      String             @default("")
   bodyBuild      String             @default("")
+  bustSize       String             @default("")
+  thighs         String             @default("")
   education      String             @default("")
   smoking        String             @default("")
   orientation    String             @default("")
   interests      String[]           @default([])
   avatarUrl      String             @default("")
   photos         String[]           @default([])
+  clips          String[]           @default([])
+  role           AccountRole        @default(ESCORT)
+  /// Public WhatsApp number for listing-board contact (digits with country code).
+  whatsapp       String             @default("")
   verified       Boolean            @default(false)
   /// How the badge was granted, so the review queue can tell an unreviewed
   /// paid badge from one a human actually approved.
@@ -133,12 +169,19 @@ model Profile {
   isLive         Boolean            @default(false)
   profileViews   Int                @default(0)
   plan           Plan               @default(FREE)
+  subscriptionExpiresAt DateTime?
+  subscriptionPlanSlug  String      @default("")
   boostedAt      DateTime?
+  boostedUntil   DateTime?
+  /// When true, the profile is taken off public browse even if a plan is active.
+  adminHidden    Boolean            @default(false)
   lastActive     DateTime           @default(now())
   createdAt      DateTime           @default(now())
   services       ServiceOffer[]
 
   @@index([verifiedSource])
+  @@index([role, city])
+  @@index([state, city])
 }
 
 model ServiceOffer {
@@ -200,6 +243,7 @@ model Post {
   body       String
   imageUrl   String    @default("")
   videoUrl   String    @default("")
+  category   String    @default("explore")
   createdAt  DateTime  @default(now())
   /// Set by an admin takedown. Hidden posts stay in the table for the audit
   /// trail but are filtered out of the feed.
@@ -212,6 +256,7 @@ model Post {
 
   @@index([createdAt])
   @@index([hiddenAt])
+  @@index([category, createdAt])
 }
 
 model PostLike {
@@ -264,6 +309,7 @@ model Payment {
   userId      String
   reference   String         @unique
   purpose     PaymentPurpose
+  productId   String         @default("")
   amountKobo  Int
   status      PaymentStatus  @default(PENDING)
   fulfilledAt DateTime?
@@ -311,4 +357,95 @@ model AdminAction {
 
   @@index([createdAt])
   @@index([targetType, targetId])
+}
+
+/// One-level commission: A earns from B's qualifying subscription payments only.
+model ReferralEarning {
+  id              String            @id @default(cuid())
+  referrerId      String
+  referredId      String
+  paymentId       String            @unique
+  sourceKobo      Int
+  amountKobo      Int
+  percent         Int
+  paymentNumber   Int
+  planName        String            @default("")
+  transactionRef  String            @default("")
+  status          CommissionStatus  @default(PENDING)
+  availableAt     DateTime
+  voidReason      String            @default("")
+  createdAt       DateTime          @default(now())
+
+  referrer User @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId, status, createdAt])
+  @@index([referredId, createdAt])
+}
+
+model Withdrawal {
+  id            String           @id @default(cuid())
+  userId        String
+  amountKobo    Int
+  status        WithdrawalStatus @default(REQUESTED)
+  accountName   String
+  accountNumber String
+  bankName      String
+  adminNote     String           @default("")
+  createdAt     DateTime         @default(now())
+  resolvedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model SubscriptionPlan {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  durationDays   Int
+  priceKobo      Int
+  active         Boolean  @default(true)
+  publicVisible  Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model BoostProduct {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  name           String
+  durationHours  Int
+  priceKobo      Int
+  active         Boolean  @default(true)
+  publicVisible  Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model PlatformSettings {
+  id                   String   @id @default("default")
+  commissionPct1       Int      @default(2)
+  commissionPct2       Int      @default(2)
+  commissionPct3       Int      @default(2)
+  qualifyingPayments   Int      @default(3)
+  minWithdrawalKobo    Int      @default(500000)
+  holdHours            Int      @default(72)
+  updatedAt            DateTime @updatedAt
+}
+
+model ListingReview {
+  id            String   @id @default(cuid())
+  listingUserId String
+  authorId      String
+  rating        Int
+  body          String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  author User @relation("reviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([listingUserId, authorId])
+  @@index([listingUserId, createdAt])
 }

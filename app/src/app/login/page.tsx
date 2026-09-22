@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
+import LoadingScreen from "@/components/LoadingScreen";
+import PasswordField from "@/components/PasswordField";
+
+function safeNext(value: string | null) {
+  if (!value) return "/";
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("://")) return "/";
+  if (value.startsWith("/502test")) return "/";
+  return value;
+}
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoadingScreen label="Loading" />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const next = safeNext(useSearchParams().get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,7 +54,7 @@ export default function LoginPage() {
         );
         return;
       }
-      router.push(data.hasProfile ? "/" : "/onboarding");
+      router.push(data.hasProfile ? next : "/onboarding");
       router.refresh();
     } catch {
       setError("Can't reach the server. Check your connection and try again.");
@@ -68,13 +86,19 @@ export default function LoginPage() {
   }
 
   return (
+    <>
+    {busy && (
+      <div className="app-loading-overlay">
+        <LoadingScreen fill={false} label="Signing you in" />
+      </div>
+    )}
     <AuthShell
       title={
         <>
           Welcome <span className="text-gradient">back</span>
         </>
       }
-      subtitle="Your matches missed you."
+      subtitle="Log in to manage your profile."
     >
       <form onSubmit={submit} className="space-y-4">
         <input
@@ -85,13 +109,12 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <input
-          type="password"
+        <PasswordField
           required
           placeholder="Password"
-          className="input"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
+          autoComplete="current-password"
         />
         <div className="text-right">
           <Link
@@ -127,9 +150,10 @@ export default function LoginPage() {
       <p className="mt-6 text-center text-sm text-muted">
         New here?{" "}
         <Link href="/signup" className="font-semibold text-gradient">
-          Join free
+          Sign up to get hooked
         </Link>
       </p>
     </AuthShell>
+    </>
   );
 }

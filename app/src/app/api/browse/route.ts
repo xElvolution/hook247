@@ -18,6 +18,9 @@ type PublicProfile = {
   bio: string;
   avatarUrl: string;
   photos: string[];
+  clips: string[];
+  whatsapp: string;
+  startingRate: number | null;
   interests: string[];
   ethnicity: string;
   bodyBuild: string;
@@ -51,6 +54,12 @@ function card(profile: ProfileWithServices): PublicProfile {
     bio: profile.bio.length > 90 ? `${profile.bio.slice(0, 90)}...` : profile.bio,
     avatarUrl: profile.avatarUrl,
     photos: profile.photos,
+    clips: profile.clips,
+    whatsapp: profile.whatsapp,
+    startingRate: profile.services
+      .flatMap((service) => [service.incallRate, service.outcallRate])
+      .filter((value): value is number => typeof value === "number" && value > 0)
+      .sort((a, b) => a - b)[0] ?? null,
     interests: profile.interests,
     ethnicity: profile.ethnicity,
     bodyBuild: profile.bodyBuild,
@@ -64,7 +73,7 @@ function card(profile: ProfileWithServices): PublicProfile {
       enabled: service.enabled,
     })),
     verified: profile.verified,
-    boosted: !!profile.boostedAt,
+    boosted: !!(profile.boostedUntil && profile.boostedUntil.getTime() > Date.now()),
     online: Date.now() - profile.lastActive.getTime() < ONLINE_WINDOW_MS,
     availableToday: profile.availableToday,
     live: profile.isLive,
@@ -100,7 +109,11 @@ export async function GET(request: Request) {
 
   // Seeded with the moderation filter so every list built from it — featured,
   // live and members alike — excludes banned accounts by construction.
-  const commonFilters: Prisma.ProfileWhereInput[] = [VISIBLE_PROFILE];
+  const commonFilters: Prisma.ProfileWhereInput[] = [
+    VISIBLE_PROFILE,
+    { role: "ESCORT" },
+    { subscriptionExpiresAt: { gt: new Date() } },
+  ];
   if (country) commonFilters.push({ country: { equals: country, mode: "insensitive" } });
   if (state) commonFilters.push({ state: { equals: state, mode: "insensitive" } });
   if (city) commonFilters.push({ city: { equals: city, mode: "insensitive" } });
@@ -119,6 +132,11 @@ export async function GET(request: Request) {
   if (maxAge >= 18) commonFilters.push({ birthDate: { gte: birthDateForAge(maxAge + 1) } });
 
   const memberFilters = [...commonFilters];
+  if (tab === "redhot") memberFilters.push({ boostedUntil: { gt: new Date() } });
+  if (tab === "available") memberFilters.push({ availableToday: true });
+  if (tab === "fresh") {
+    memberFilters.push({ lastActive: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
+  }
   if (tab === "verified") memberFilters.push({ verified: true });
   if (tab === "online") {
     memberFilters.push({
@@ -146,10 +164,10 @@ export async function GET(request: Request) {
   const [featured, liveProfiles, members] = await Promise.all([
     db.profile.findMany({
       where: {
-        AND: [commonWhere, { OR: [{ boostedAt: { not: null } }, { verified: true }] }],
+        AND: [commonWhere, { OR: [{ boostedUntil: { gt: new Date() } }, { verified: true }] }],
       },
       include: { services },
-      orderBy: [{ boostedAt: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
+      orderBy: [{ boostedUntil: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
       take: 10,
     }),
     db.profile.findMany({
@@ -166,7 +184,7 @@ export async function GET(request: Request) {
       orderBy:
         tab === "new"
           ? { createdAt: "desc" }
-          : [{ boostedAt: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
+          : [{ boostedUntil: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
       take: 24,
     }),
   ]);
@@ -176,7 +194,8 @@ export async function GET(request: Request) {
     live: liveProfiles.map(card),
     members: members.map(card),
   });
-  } catch {
-    return NextResponse.json(mockBrowse());
+  } catch (err) {
+    console.error("browse failed", err);
+    return NextResponse.json({ featured: [], live: [], members: [] }, { status: 503 });
   }
 }

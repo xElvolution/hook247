@@ -21,7 +21,7 @@ type SeedUser = {
   education?: string;
   smoking?: string;
   orientation?: string;
-  services?: Array<{ name: string; outcallRate: number; incallRate?: number }>;
+  services?: Array<{ name: string; outcallRate?: number | null; incallRate?: number | null }>;
   plan?: Plan;
   verified?: boolean;
   boosted?: boolean;
@@ -31,16 +31,16 @@ type SeedUser = {
 
 const USERS: SeedUser[] = [
   { email: "demo@hook247.app", name: "Demo", gender: "MALE", lookingFor: ["FEMALE"], age: 27, city: "Ikeja", state: "Lagos", bio: "Just here to test the vibe. Swipe kindly.", interests: ["Tech", "Music", "Foodie"], style: "micah", plan: "ELITE", verified: true, ethnicity: "Black / African", bodyBuild: "Athletic", education: "BSc", smoking: "No", orientation: "Straight" },
-  { email: "amara@hook247.app", name: "Amara", gender: "FEMALE", lookingFor: ["MALE"], age: 24, city: "Lekki", state: "Lagos", bio: "Amala on Sundays, amapiano always. Make me laugh and we're halfway there.", interests: ["Afrobeats", "Foodie", "Dancing"], style: "lorelei", verified: true, boosted: true, live: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Curvy", education: "BSc", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates", outcallRate: 60000 }, { name: "Event companion", outcallRate: 90000 }] },
-  { email: "zainab@hook247.app", name: "Zainab", gender: "FEMALE", lookingFor: ["MALE"], age: 23, city: "Maitama", state: "Federal Capital Territory", bio: "Med student by day, jollof critic by night. 🍚", interests: ["Books", "Movies", "Travel"], style: "lorelei", verified: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "BSc", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates", outcallRate: 55000 }] },
+  { email: "amara@hook247.app", name: "Amara", gender: "FEMALE", lookingFor: ["MALE"], age: 24, city: "Lekki", state: "Lagos", bio: "Amala on Sundays, amapiano always. Make me laugh and we're halfway there.", interests: ["Afrobeats", "Foodie", "Dancing"], style: "lorelei", verified: true, boosted: true, live: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Curvy", education: "BSc", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates", outcallRate: null }, { name: "GFE (Girlfriend experience)", outcallRate: null }, { name: "SHORT TIME", outcallRate: 60000 }, { name: "OVER NIGHT", outcallRate: 90000 }] },
+  { email: "zainab@hook247.app", name: "Zainab", gender: "FEMALE", lookingFor: ["MALE"], age: 23, city: "Maitama", state: "Federal Capital Territory", bio: "Med student by day, jollof critic by night. 🍚", interests: ["Books", "Movies", "Travel"], style: "lorelei", verified: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "BSc", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates" }, { name: "SHORT TIME", outcallRate: 55000 }] },
   { email: "bisi@hook247.app", name: "Bisi", gender: "FEMALE", lookingFor: ["MALE", "FEMALE"], age: 26, city: "Bodija", state: "Oyo", bio: "Gym in the morning, galleries in the evening. Balance.", interests: ["Gym", "Art", "Fashion"], style: "adventurer", ethnicity: "Black / African", bodyBuild: "Athletic", education: "Diploma", smoking: "Occasionally", orientation: "Bisexual", services: [{ name: "Massage", outcallRate: 45000, incallRate: 35000 }] },
   { email: "chiamaka@hook247.app", name: "Chiamaka", gender: "FEMALE", lookingFor: ["MALE"], age: 25, city: "New Haven", state: "Enugu", bio: "Product designer. I will redesign your life (affectionately).", interests: ["Tech", "Art", "Music"], style: "notionists", verified: true, ethnicity: "Black / African", bodyBuild: "Average", education: "Masters", smoking: "No", orientation: "Straight" },
-  { email: "tolu@hook247.app", name: "Tolu", gender: "FEMALE", lookingFor: ["MALE"], age: 22, city: "Victoria Island", state: "Lagos", bio: "Island girl with mainland energy. Suya > roses.", interests: ["Nightlife", "Foodie", "Afrobeats"], style: "adventurer", live: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "Diploma", smoking: "Occasionally", orientation: "Straight", services: [{ name: "Dinner Dates", outcallRate: 50000 }, { name: "Travel companion", outcallRate: 200000 }] },
+  { email: "tolu@hook247.app", name: "Tolu", gender: "FEMALE", lookingFor: ["MALE"], age: 22, city: "Victoria Island", state: "Lagos", bio: "Island girl with mainland energy. Suya > roses.", interests: ["Nightlife", "Foodie", "Afrobeats"], style: "adventurer", live: true, availableToday: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "Diploma", smoking: "Occasionally", orientation: "Straight", services: [{ name: "Dinner Dates" }, { name: "Travel Companion" }, { name: "SHORT TIME", outcallRate: 50000 }, { name: "WEEKEND", outcallRate: 200000 }] },
   { email: "emeka@hook247.app", name: "Emeka", gender: "MALE", lookingFor: ["FEMALE"], age: 29, city: "Independence Layout", state: "Enugu", bio: "Software engineer. My love language is fixing your wifi.", interests: ["Tech", "Gaming", "Football"], style: "micah", verified: true, ethnicity: "Black / African", bodyBuild: "Average", education: "BSc", smoking: "No", orientation: "Straight" },
   { email: "tunde@hook247.app", name: "Tunde", gender: "MALE", lookingFor: ["FEMALE"], age: 27, city: "Wuse", state: "Federal Capital Territory", bio: "Photographer. I'll make your grid unrecognizable.", interests: ["Art", "Travel", "Movies"], style: "avataaars", boosted: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "BSc", smoking: "Occasionally", orientation: "Straight" },
   { email: "kelechi@hook247.app", name: "Kelechi", gender: "MALE", lookingFor: ["FEMALE", "NONBINARY"], age: 31, city: "Port Harcourt", state: "Rivers", bio: "Chef. Yes, I will cook for you. No, not on the first date.", interests: ["Foodie", "Music", "Faith"], style: "micah", ethnicity: "Black / African", bodyBuild: "Average", education: "Diploma", smoking: "No", orientation: "Straight" },
-  { email: "dami@hook247.app", name: "Dami", gender: "NONBINARY", lookingFor: ["MALE", "FEMALE", "NONBINARY"], age: 24, city: "Yaba", state: "Lagos", bio: "DJ + producer. Come for the playlists, stay for the plantain.", interests: ["Music", "Nightlife", "Afrobeats"], style: "notionists", verified: true, live: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "Secondary", smoking: "Occasionally", orientation: "Queer", services: [{ name: "Event companion", outcallRate: 80000 }] },
-  { email: "ngozi@hook247.app", name: "Ngozi", gender: "FEMALE", lookingFor: ["MALE"], age: 28, city: "Ajah", state: "Lagos", bio: "Lawyer. I argue for a living — I promise I'm fun at parties.", interests: ["Books", "Fashion", "Travel"], style: "lorelei", plan: "PLUS", availableToday: true, ethnicity: "Black / African", bodyBuild: "Curvy", education: "Masters", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates", outcallRate: 70000 }, { name: "Full evening", outcallRate: 150000 }] },
+  { email: "dami@hook247.app", name: "Dami", gender: "NONBINARY", lookingFor: ["MALE", "FEMALE", "NONBINARY"], age: 24, city: "Yaba", state: "Lagos", bio: "DJ + producer. Come for the playlists, stay for the plantain.", interests: ["Music", "Nightlife", "Afrobeats"], style: "notionists", verified: true, live: true, ethnicity: "Black / African", bodyBuild: "Slim", education: "Secondary", smoking: "Occasionally", orientation: "Queer", services: [{ name: "Travel Companion" }, { name: "SHORT TIME", outcallRate: 80000 }] },
+  { email: "ngozi@hook247.app", name: "Ngozi", gender: "FEMALE", lookingFor: ["MALE"], age: 28, city: "Ajah", state: "Lagos", bio: "Lawyer. I argue for a living. I promise I'm fun at parties.", interests: ["Books", "Fashion", "Travel"], style: "lorelei", plan: "PLUS", availableToday: true, ethnicity: "Black / African", bodyBuild: "Curvy", education: "Masters", smoking: "No", orientation: "Straight", services: [{ name: "Dinner Dates" }, { name: "SHORT TIME", outcallRate: 70000 }, { name: "OVER NIGHT", outcallRate: 150000 }] },
   { email: "ibrahim@hook247.app", name: "Ibrahim", gender: "MALE", lookingFor: ["FEMALE"], age: 30, city: "Nassarawa", state: "Kano", bio: "Architect. I notice ceilings. It's a problem.", interests: ["Art", "Tech", "Faith"], style: "avataaars", ethnicity: "Black / African", bodyBuild: "Average", education: "Masters", smoking: "No", orientation: "Straight" },
 ];
 
@@ -71,7 +71,12 @@ async function main() {
       where: { email: u.email },
       // Seeded accounts are pre-confirmed so the app is usable straight after
       // seeding without going through the mail flow for each one.
-      create: { email: u.email, passwordHash, emailVerified: true },
+      create: {
+        email: u.email,
+        passwordHash,
+        emailVerified: true,
+        referralCode: u.email.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase(),
+      },
       update: { emailVerified: true },
     });
     idByEmail.set(u.email, user.id);
@@ -111,12 +116,12 @@ async function main() {
         create: {
           profileId: profile.id,
           name: s.name,
-          outcallRate: s.outcallRate,
+          outcallRate: s.outcallRate ?? null,
           incallRate: s.incallRate ?? null,
           enabled: true,
         },
         update: {
-          outcallRate: s.outcallRate,
+          outcallRate: s.outcallRate ?? null,
           incallRate: s.incallRate ?? null,
           enabled: true,
         },

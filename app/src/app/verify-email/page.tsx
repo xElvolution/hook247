@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, CheckCircle2 } from "lucide-react";
 import AuthShell from "@/components/AuthShell";
+import LoadingScreen from "@/components/LoadingScreen";
 
-export default function VerifyEmailPage() {
+function VerifyEmailForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const birth = params.get("birth") ?? "";
+  const mailFailed = params.get("mail") === "failed";
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    mailFailed
+      ? "Account created. The first code did not send. Tap resend below."
+      : ""
+  );
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
   const [sendBusy, setSendBusy] = useState(false);
@@ -31,8 +39,11 @@ export default function VerifyEmailPage() {
         setError(data.error ?? "Verification failed. Check the code and try again.");
         return;
       }
-      setSuccess("Email verified! Redirecting...");
-      setTimeout(() => router.push("/"), 1500);
+      setSuccess("Email verified! Continuing...");
+      const next = birth
+        ? `/onboarding?birth=${encodeURIComponent(birth)}`
+        : "/onboarding";
+      setTimeout(() => router.push(next), 800);
     } catch {
       setError("Can't reach the server. Check your connection and try again.");
     } finally {
@@ -65,6 +76,12 @@ export default function VerifyEmailPage() {
   }
 
   return (
+    <>
+    {(busy || sendBusy) && (
+      <div className="app-loading-overlay">
+        <LoadingScreen fill={false} label={sendBusy ? "Sending code" : "Verifying"} />
+      </div>
+    )}
     <AuthShell
       title={
         <>
@@ -120,10 +137,22 @@ export default function VerifyEmailPage() {
           <Mail className="inline h-4 w-4" />{" "}
           {sendBusy ? "Sending…" : "Didn't get it? Resend code"}
         </button>
-        <Link href="/discover" className="text-xs text-muted hover:text-white">
+        <Link
+          href={birth ? `/onboarding?birth=${encodeURIComponent(birth)}` : "/onboarding"}
+          className="text-xs text-muted hover:text-white"
+        >
           Skip for now
         </Link>
       </div>
     </AuthShell>
+    </>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }

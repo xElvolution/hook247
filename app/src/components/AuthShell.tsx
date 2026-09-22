@@ -23,8 +23,10 @@ export default function AuthShell({
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="glass relative z-10 w-full max-w-md rounded-3xl p-8"
       >
-        <Link href="/" className="font-display text-xl font-extrabold">
-          Hook<span className="text-gradient">247</span>
+        <Link href="/" className="flex items-center gap-2 font-display text-xl font-extrabold">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" className="h-8 w-8 rounded-md" />
+          Hooks<span className="text-gradient">247</span>
         </Link>
         <h1 className="font-display mt-6 text-3xl font-bold">{title}</h1>
         <p className="mt-2 text-sm text-muted">{subtitle}</p>

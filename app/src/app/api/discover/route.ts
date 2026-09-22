@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json(mockDiscover());
   }
 
-  let where: Prisma.ProfileWhereInput = VISIBLE_PROFILE;
+  let where: Prisma.ProfileWhereInput = { AND: [VISIBLE_PROFILE, { role: "ESCORT" }] };
   if (userId) {
     const me = await db.profile.findUnique({ where: { userId } });
     if (me) {
@@ -24,6 +24,7 @@ export async function GET() {
         AND: [
           VISIBLE_PROFILE,
           {
+            role: "ESCORT",
             userId: { notIn: [userId, ...alreadySwiped.map((s) => s.swipedId)] },
             gender: { in: me.lookingFor },
             lookingFor: { has: me.gender },
@@ -53,7 +54,7 @@ export async function GET() {
       avatarUrl: p.avatarUrl,
       photos: p.photos,
       verified: p.verified,
-      boosted: !!p.boostedAt,
+      boosted: !!(p.boostedUntil && p.boostedUntil.getTime() > Date.now()),
       live: p.isLive,
       services: p.services.map((service) => service.name),
     })),

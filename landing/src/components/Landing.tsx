@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
@@ -17,60 +17,79 @@ import {
 gsap.registerPlugin(ScrollTrigger);
 
 // The app lives in its own project — all CTAs cross over to it.
-const APP = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+const FALLBACK_APP = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.hooks247.com";
+
+function resolveAppOrigin() {
+  if (typeof window === "undefined") return FALLBACK_APP;
+  const { protocol, hostname } = window.location;
+  if (
+    hostname === "hooks247.com" ||
+    hostname === "www.hooks247.com" ||
+    hostname === "app.hooks247.com"
+  ) {
+    return "https://app.hooks247.com";
+  }
+  if (hostname.startsWith("app.")) return `${protocol}//${hostname}`;
+  return `${protocol}//app.${hostname}`;
+}
 
 const FLOATING_CARDS = [
-  { name: "Amara, 24", city: "Lagos", seed: "amara", x: "8%", y: "18%", r: -8 },
-  { name: "Tunde, 27", city: "Abuja", seed: "tunde", x: "78%", y: "12%", r: 6 },
-  { name: "Zainab, 23", city: "Port Harcourt", seed: "zainab", x: "84%", y: "58%", r: -5 },
-  { name: "Emeka, 29", city: "Enugu", seed: "emeka", x: "4%", y: "62%", r: 7 },
+  { name: "ChiChi, 26", city: "Lekki", photo: "/listings/listing-chichi.jpg", x: "8%", y: "18%", r: -8 },
+  { name: "Kemi, 25", city: "Victoria Island", photo: "/listings/listing-kemi.jpg", x: "78%", y: "12%", r: 6 },
+  { name: "Bisi, 28", city: "Ikeja", photo: "/listings/listing-bisi.jpg", x: "84%", y: "58%", r: -5 },
+  { name: "Titi, 24", city: "Yaba", photo: "/listings/listing-titi.jpg", x: "4%", y: "62%", r: 7 },
 ];
 
 const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Flame,
-    title: "Swipe that hits different",
-    body: "A silky card deck with real physics. Like, pass, and get instant match fireworks when it's mutual.",
+    title: "Search by area",
+    body: "Lekki, Ikeja, VI, Abuja. Filter and see who is actually in that part of town.",
   },
   {
     icon: Newspaper,
-    title: "The Feed",
-    body: "Dating apps feel like interviews. Hook247 has a live social feed — post your vibe, react, comment, get noticed before you even match.",
+    title: "Photos, clips and rates",
+    body: "Each profile shows pictures, short clips, and Short time / Overnight / Weekend prices.",
   },
   {
     icon: BadgeCheck,
-    title: "Verified humans only",
-    body: "Blue-check verification keeps catfish out. See who's real at a glance.",
+    title: "Verified profiles",
+    body: "Blue-check verification keeps catfish out. See who is real at a glance.",
   },
   {
     icon: Zap,
-    title: "Boost to the top",
-    body: "One tap puts your profile first in the deck for everyone nearby. Prime-time energy, any time.",
+    title: "Red Hot and Fresh",
+    body: "Boost to sit at the front of search in your area. Featured profiles get seen first.",
   },
   {
     icon: Eye,
-    title: "See who likes you",
-    body: "Skip the guessing. Premium members see every like the moment it lands.",
+    title: "No signup to browse",
+    body: "Open the site, search, and look. You only create an account if you want to list yourself.",
   },
   {
     icon: MessageCircle,
-    title: "Chat that flows",
-    body: "Fast, private messaging the second you match. No games, no waiting.",
+    title: "WhatsApp direct",
+    body: "Tap WhatsApp on a profile. Ask availability yourself. Private and discreet.",
   },
 ];
 
 const STATS = [
   { label: "always on", value: 247, suffix: "" },
-  { label: "match rate", value: 89, suffix: "%" },
-  { label: "cities live", value: 36, suffix: "+" },
+  { label: "areas listed", value: 36, suffix: "+" },
+  { label: "cities live", value: 12, suffix: "+" },
 ];
 
 const MARQUEE = [
-  "24/7", "MATCH", "VIBE", "CHAT", "VERIFIED", "BOOST", "FEED", "REAL ONES",
+  "24/7", "LEKKI", "RATES", "WHATSAPP", "VERIFIED", "BOOST", "LISTINGS", "REAL ONES",
 ];
 
 export default function Landing() {
   const root = useRef<HTMLDivElement>(null);
+  const [APP, setAPP] = useState(FALLBACK_APP);
+
+  useEffect(() => {
+    setAPP(resolveAppOrigin());
+  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -158,7 +177,7 @@ export default function Landing() {
     return () => ctx.revert();
   }, []);
 
-  const headline = "Dating that never sleeps.";
+  const headline = "Listings that never sleep.";
 
   return (
     <div ref={root} className="relative min-h-screen overflow-hidden">
@@ -167,16 +186,18 @@ export default function Landing() {
       <div className="orb h-[380px] w-[380px] bg-[#ff6b2c]/25 bottom-0 left-[35%]" />
 
       {/* nav */}
-      <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="font-display text-2xl font-extrabold tracking-tight">
-          Hook<span className="text-gradient">247</span>
+      <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 md:px-6 md:py-5">
+        <div className="flex items-center gap-2 font-display text-base font-extrabold tracking-tight md:text-xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg md:h-9 md:w-9" />
+          Hooks<span className="text-gradient">247</span>
         </div>
-        <div className="flex items-center gap-3">
-          <a href={`${APP}/login`} className="btn-ghost !py-2.5 !px-5 text-sm">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
+          <a href={`${APP}/login`} className="btn-ghost !rounded-lg !px-3.5 !py-2 text-sm md:!px-5">
             Log in
           </a>
-          <a href={`${APP}/signup`} className="btn-primary !py-2.5 !px-5 text-sm">
-            Join free
+          <a href={`${APP}/signup`} className="btn-primary !rounded-lg !px-3.5 !py-2 text-sm md:!px-5">
+            List my profile
           </a>
         </div>
       </nav>
@@ -185,15 +206,15 @@ export default function Landing() {
       <section className="relative z-10 mx-auto flex min-h-[78vh] max-w-6xl flex-col items-center justify-center px-6 text-center">
         {FLOATING_CARDS.map((c) => (
           <div
-            key={c.seed}
+            key={c.photo}
             className="float-card glass absolute hidden w-40 rounded-2xl p-3 md:block"
             style={{ left: c.x, top: c.y, transform: `rotate(${c.r}deg)` }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${c.seed}&backgroundColor=1f1229`}
-              alt=""
-              className="h-32 w-full rounded-xl object-cover"
+              src={c.photo}
+              alt={c.name}
+              className="h-36 w-full rounded-xl object-cover object-top"
             />
             <div className="mt-2 text-left">
               <p className="text-sm font-semibold">{c.name}</p>
@@ -203,10 +224,10 @@ export default function Landing() {
         ))}
 
         <p className="hero-fade mb-5 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-[0.2em] text-muted uppercase">
-          18+ · Verified profiles · Always on
+          18+ · Independent models · WhatsApp direct
         </p>
 
-        <h1 className="font-display max-w-4xl text-5xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
+        <h1 className="font-display max-w-4xl text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
           {headline.split(" ").map((word, wi) => (
             <span key={wi} className="inline-block overflow-hidden pb-1 align-bottom">
               <span className="inline-block whitespace-pre">
@@ -226,18 +247,18 @@ export default function Landing() {
           ))}
         </h1>
 
-        <p className="hero-fade mt-6 max-w-xl text-lg text-muted">
-          Swipe, match and vibe with real people near you — morning, midnight,
-          whenever the mood hits. Hook247 is the dating platform that runs on
-          your clock.
+        <p className="hero-fade mt-5 max-w-xl text-base text-muted">
+          Beauty may catch your eye. Personality keeps you here. Search by
+          area, view photos and rates, then WhatsApp. List for free. Browse
+          without signing up.
         </p>
 
-        <div className="hero-fade mt-9 flex flex-wrap items-center justify-center gap-4">
-          <a href={APP} className="btn-primary text-base">
-            Enter Hook247 — it&apos;s free
+        <div className="hero-fade mt-7 flex flex-wrap items-center justify-center gap-2 md:mt-9 md:gap-4">
+          <a href={APP} className="btn-primary !px-4 !py-2 text-sm md:!px-6 md:!py-3 md:text-base">
+            Browse listings
           </a>
-          <a href="#features" className="btn-ghost text-base">
-            See the vibe <ArrowDown className="h-4 w-4" />
+          <a href="#features" className="btn-ghost !px-4 !py-2 text-sm md:!px-6 md:!py-3 md:text-base">
+            How it works <ArrowDown className="h-4 w-4" />
           </a>
         </div>
       </section>
@@ -259,12 +280,12 @@ export default function Landing() {
       </div>
 
       {/* features */}
-      <section id="features" className="relative z-10 mx-auto max-w-6xl px-6 py-28">
-        <h2 className="font-display text-center text-3xl font-bold md:text-5xl">
-          Not just another <span className="text-gradient">dating app</span>
+      <section id="features" className="relative z-10 mx-auto max-w-6xl px-4 py-14 md:px-6 md:py-24">
+        <h2 className="font-display text-center text-2xl font-bold md:text-4xl">
+          Search. Open. <span className="text-gradient">WhatsApp.</span>
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-center text-muted">
-          Everything you need to go from stranger to spark — built in.
+          Come discover what makes them different.
         </p>
 
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -303,18 +324,17 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-28">
-        <div className="cta-block glass relative overflow-hidden rounded-[2.5rem] px-8 py-20 text-center">
+      <section className="relative z-10 mx-auto max-w-6xl px-4 py-16 md:px-6 md:py-28">
+        <div className="cta-block glass relative overflow-hidden rounded-[1.75rem] px-5 py-12 text-center md:rounded-[2.5rem] md:px-8 md:py-20">
           <div className="orb h-[300px] w-[300px] bg-[#ff2d78]/30 -top-20 -right-10" />
-          <h2 className="font-display text-4xl font-extrabold md:text-6xl">
-            Your person is <span className="text-gradient">awake too.</span>
+          <h2 className="font-display text-2xl font-extrabold md:text-5xl">
+            Find someone in <span className="text-gradient">your area.</span>
           </h2>
-          <p className="mx-auto mt-5 max-w-md text-muted">
-            Join Hook247 free. Set up your profile in two minutes and start
-            matching tonight.
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted md:mt-5 md:text-base">
+            Browse free. List your profile in two minutes.
           </p>
-          <a href={APP} className="btn-primary mt-9 text-base">
-            Take me inside
+          <a href={APP} className="btn-primary mt-6 !px-4 !py-2 text-sm md:mt-9 md:!px-6 md:!py-3 md:text-base">
+            Browse listings
           </a>
         </div>
       </section>
@@ -323,10 +343,10 @@ export default function Landing() {
       <footer className="relative z-10 border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-muted md:flex-row">
           <div className="font-display font-bold text-ink">
-            Hook<span className="text-gradient">247</span>
+            Hooks<span className="text-gradient">247</span>
           </div>
           <p>Strictly 18+. Be kind, be real, be safe.</p>
-          <p>© {new Date().getFullYear()} Hook247</p>
+          <p>© {new Date().getFullYear()} Hooks247</p>
         </div>
       </footer>
     </div>

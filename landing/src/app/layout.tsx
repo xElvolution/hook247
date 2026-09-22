@@ -6,9 +6,13 @@ const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hook247 — Dating that never sleeps",
+  title: "Hooks247",
   description:
-    "Hook247 is the 24/7 dating platform. Swipe, match, chat and vibe with real, verified people near you.",
+    "Independent models, 24/7. Search by area, view photos and rates, then WhatsApp. Beauty may catch your eye. Personality keeps you here.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

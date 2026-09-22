@@ -1,25 +1,11 @@
 import { db } from "@/lib/db";
 import { verifyTransaction } from "@/lib/paystack";
 import { sendReceiptEmail } from "@/lib/mailer";
-
-/**
- * Fulfilment is shared by two callers that can race each other: the Paystack
- * webhook and the browser landing back on /premium after checkout. Whichever
- * arrives first wins; the other becomes a no-op. That matters because the
- * webhook needs a publicly reachable URL, so during local development the
- * callback is often the only path that runs.
- */
+import { creditReferralCommission } from "@/lib/referrals";
 
 export type FulfilResult =
-  | { ok: true; state: "fulfilled" | "already" ; description?: string }
+  | { ok: true; state: "fulfilled" | "already"; description?: string }
   | { ok: false; state: "unknown" | "failed"; error: string };
-
-const DESCRIPTIONS = {
-  PLAN_PLUS: "Plus plan",
-  PLAN_ELITE: "Elite plan",
-  BOOST: "Profile Boost (1 hour)",
-  VERIFICATION: "Profile verification",
-} as const;
 
 export async function fulfilPayment(reference: string): Promise<FulfilResult> {
   const payment = await db.payment.findUnique({ where: { reference } });
@@ -29,10 +15,17 @@ export async function fulfilPayment(reference: string): Promise<FulfilResult> {
   if (payment.status === "SUCCESS") {
     return { ok: true, state: "already" };
   }
+  if (payment.status === "FAILED" || payment.status === "ABANDONED") {
+    return { ok: false, state: "failed", error: "Payment did not succeed" };
+  }
 
-  // Confirm with Paystack before granting anything. The amount must match what
-  // we asked for, so a tampered callback cannot buy Elite at Boost prices.
-  const verified = await verifyTransaction(reference);
+  let verified: Awaited<ReturnType<typeof verifyTransaction>>;
+  try {
+    verified = await verifyTransaction(reference);
+  } catch (err) {
+    console.error("Paystack verify threw:", err);
+    return { ok: false, state: "failed", error: "Could not verify with Paystack" };
+  }
   if (!verified.success || verified.amountKobo !== payment.amountKobo) {
     await db.payment.updateMany({
       where: { id: payment.id, status: "PENDING" },
@@ -41,8 +34,6 @@ export async function fulfilPayment(reference: string): Promise<FulfilResult> {
     return { ok: false, state: "failed", error: "Verification failed" };
   }
 
-  // Atomically claim the row: only the caller that flips PENDING -> SUCCESS
-  // applies the benefit, so a webhook/callback race cannot double-grant.
   const claimed = await db.payment.updateMany({
     where: { id: payment.id, status: "PENDING" },
     data: { status: "SUCCESS", fulfilledAt: new Date() },
@@ -63,30 +54,79 @@ export async function fulfilPayment(reference: string): Promise<FulfilResult> {
     return { ok: false, state: "failed", error: "Profile not found" };
   }
 
-  const { purpose } = payment;
-  if (purpose === "PLAN_PLUS") {
-    await db.profile.update({ where: { userId: payment.userId }, data: { plan: "PLUS" } });
-  } else if (purpose === "PLAN_ELITE") {
-    await db.profile.update({ where: { userId: payment.userId }, data: { plan: "ELITE" } });
-  } else if (purpose === "BOOST") {
+  let description = "Purchase";
+  let planName = "";
+  const now = new Date();
+
+  if (payment.purpose === "SUBSCRIPTION" || payment.purpose === "PLAN_PLUS" || payment.purpose === "PLAN_ELITE") {
+    let days = payment.purpose === "PLAN_ELITE" ? 90 : 30;
+    let slug = payment.purpose === "PLAN_ELITE" ? "quarterly" : "monthly";
+    let name = payment.purpose === "PLAN_ELITE" ? "3 Months" : "Monthly";
+    if (payment.productId) {
+      const plan = await db.subscriptionPlan.findUnique({ where: { id: payment.productId } });
+      if (plan) {
+        days = plan.durationDays;
+        slug = plan.slug;
+        name = plan.name;
+      }
+    }
+    const base =
+      profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > now
+        ? profile.subscriptionExpiresAt
+        : now;
+    const expires = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
     await db.profile.update({
       where: { userId: payment.userId },
-      data: { boostedAt: new Date() },
+      data: {
+        plan: days >= 90 ? "ELITE" : "PLUS",
+        subscriptionExpiresAt: expires,
+        subscriptionPlanSlug: slug,
+      },
     });
-  } else if (purpose === "VERIFICATION") {
-    // Paying sets the badge but records that no human checked an ID, so the
-    // admin review queue can still find and confirm it.
+    description = name;
+    planName = name;
+  } else if (payment.purpose === "BOOST") {
+    let hours = 168;
+    let name = "7-Day Profile Boost";
+    if (payment.productId) {
+      const product = await db.boostProduct.findUnique({ where: { id: payment.productId } });
+      if (product) {
+        hours = product.durationHours;
+        name = product.name;
+      }
+    }
+    const current =
+      profile.boostedUntil && profile.boostedUntil > now ? profile.boostedUntil : now;
+    const until = new Date(current.getTime() + hours * 60 * 60 * 1000);
+    await db.profile.update({
+      where: { userId: payment.userId },
+      data: { boostedAt: now, boostedUntil: until },
+    });
+    description = name;
+  } else if (payment.purpose === "VERIFICATION") {
     await db.profile.update({
       where: { userId: payment.userId },
       data: {
         verified: true,
         verifiedSource: "PAID",
-        verifiedAt: new Date(),
+        verifiedAt: now,
       },
     });
+    description = "Profile verification";
   }
 
-  const description = DESCRIPTIONS[purpose];
+  try {
+    await creditReferralCommission({
+      referredUserId: payment.userId,
+      paymentId: payment.id,
+      sourceKobo: payment.amountKobo,
+      purpose: payment.purpose,
+      planName,
+      transactionRef: payment.reference,
+    });
+  } catch (err) {
+    console.error("Referral commission failed:", err);
+  }
 
   try {
     await sendReceiptEmail(
@@ -96,7 +136,6 @@ export async function fulfilPayment(reference: string): Promise<FulfilResult> {
       payment.reference
     );
   } catch (err) {
-    // The purchase is already active; a mail outage must not undo it.
     console.error("Failed to send receipt email:", err);
   }
 

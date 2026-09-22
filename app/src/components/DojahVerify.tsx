@@ -24,7 +24,7 @@ export default function DojahVerify({
   widgetId: string;
   verified: boolean;
 }) {
-  const configured = Boolean(appId && publicKey && widgetId);
+  const configured = Boolean(appId && publicKey);
   // The script may already be on the page from an earlier mount; seed from that
   // rather than an effect (which would trigger a cascading render).
   const [scriptReady, setScriptReady] = useState(
@@ -37,7 +37,7 @@ export default function DojahVerify({
   const launch = useCallback(() => {
     setError("");
     if (!window.Connect) {
-      setError("Verification is still loading — try again in a moment.");
+      setError("Verification is still loading. Try again in a moment.");
       return;
     }
     setBusy(true);
@@ -45,8 +45,8 @@ export default function DojahVerify({
       const connect = new window.Connect({
         app_id: appId,
         p_key: publicKey,
-        type: "custom",
-        config: { widget_id: widgetId },
+        type: widgetId ? "custom" : "verification",
+        ...(widgetId ? { config: { widget_id: widgetId } } : {}),
         metadata: { user_id: userId },
         onSuccess: () => {
           // The webhook does the real grant; reflect "in review" here.
@@ -90,11 +90,11 @@ export default function DojahVerify({
         <p className="mt-1.5 flex items-start gap-2 text-sm text-emerald-400">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
           Check submitted. Your badge appears once your ID and selfie are
-          confirmed — usually within a few minutes.
+          confirmed, usually within a few minutes.
         </p>
       ) : (
         <p className="mt-1.5 text-sm text-muted">
-          Free — confirm your NIN and take a quick selfie to prove you&apos;re
+          Free. Confirm your NIN and take a quick selfie to prove you&apos;re
           real and get the verified badge.
         </p>
       )}

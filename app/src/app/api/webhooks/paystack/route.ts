@@ -35,13 +35,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing reference" }, { status: 400 });
   }
 
-  const result = await fulfilPayment(reference);
+  try {
+    const result = await fulfilPayment(reference);
 
-  if (!result.ok && result.state === "unknown") {
-    // Not ours — acknowledge so Paystack stops retrying.
-    console.warn(`Webhook received for unknown reference: ${reference}`);
-    return NextResponse.json({ ok: true, unknown: reference });
+    if (!result.ok && result.state === "unknown") {
+      console.warn(`Webhook received for unknown reference: ${reference}`);
+      return NextResponse.json({ ok: true, unknown: reference });
+    }
+
+    return NextResponse.json({ ok: result.ok, state: result.state, reference });
+  } catch (err) {
+    console.error("Paystack webhook fulfilment failed:", err);
+    return NextResponse.json({ ok: false, retry: true, reference }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: result.ok, state: result.state, reference });
 }

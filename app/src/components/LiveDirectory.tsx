@@ -93,7 +93,7 @@ export default function LiveDirectory({ authed, hosts }: { authed: boolean; host
     <main className="live-feed">
       <header className="live-feed-topbar">
         <Link href="/" aria-label="Close live feed"><X className="h-5 w-5" /></Link>
-        <strong>Hook247 Live</strong>
+        <strong>Hooks247 Live</strong>
         <span>{hosts.length} rooms</span>
       </header>
       <div className="live-feed-scroller">

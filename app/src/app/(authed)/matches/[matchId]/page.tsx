@@ -89,7 +89,7 @@ export default function ChatPage({
       <div className="scroll-thin my-4 flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.length === 0 && (
           <p className="mt-10 text-center text-sm text-muted">
-            You matched! Break the ice — ask about their vibe.
+            You matched! Break the ice. Ask about their vibe.
           </p>
         )}
         {messages.map((m) => (

@@ -51,7 +51,7 @@ export default async function PaymentsPage({
       <div>
         <h1 className="font-display text-2xl font-bold">Payments</h1>
         <p className="mt-1 text-sm text-muted">
-          Newest 100. Retry is safe to press twice — fulfilment claims each row
+          Newest 100. Retry is safe to press twice. Fulfilment claims each row
           atomically, so a benefit is granted exactly once.
         </p>
       </div>

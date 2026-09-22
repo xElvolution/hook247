@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -11,11 +11,12 @@ import {
   ListChecks,
   Star,
 } from "lucide-react";
-import { formatNaira, type ServiceRate } from "@/lib/profileOptions";
+import { formatNaira, isRatePackage, type ServiceRate } from "@/lib/profileOptions";
+import ReviewForm from "@/components/ReviewForm";
 
 type ProfileTab = "about" | "gallery" | "timeline" | "services" | "rates" | "reviews";
 type TimelineItem = { title: string; body: string; date: string };
-type Review = { author: string; rating: number; body: string; date: string };
+type Review = { id?: string; author: string; rating: number; body: string; date: string };
 
 export default function PublicProfileSections({
   bio,
@@ -24,9 +25,12 @@ export default function PublicProfileSections({
   interests,
   profileName,
   profileViews,
-  reviews,
+  reviews: initialReviews,
   services,
   timeline,
+  listingUserId,
+  authed,
+  isMine,
 }: {
   bio: string;
   details: { label: string; value: string }[];
@@ -37,19 +41,37 @@ export default function PublicProfileSections({
   reviews: Review[];
   services: ServiceRate[];
   timeline: TimelineItem[];
+  listingUserId: string;
+  authed: boolean;
+  isMine: boolean;
 }) {
   const [active, setActive] = useState<ProfileTab>("about");
+  const [reviews, setReviews] = useState(initialReviews);
+  const [average, setAverage] = useState(0);
+
+  async function loadReviews() {
+    const res = await fetch(`/api/reviews?listingUserId=${encodeURIComponent(listingUserId)}`);
+    const data = await res.json().catch(() => ({ reviews: [], average: 0 }));
+    setReviews(data.reviews ?? []);
+    setAverage(data.average ?? 0);
+  }
+
+  useEffect(() => {
+    void loadReviews();
+  }, [listingUserId]);
+  const offerings = services.filter((service) => !isRatePackage(service.name));
+  const rateRows = services.filter((service) => isRatePackage(service.name));
   const tabs: { id: ProfileTab; label: string; count?: number; icon: typeof Info }[] = [
     { id: "about", label: "About", icon: Info },
     { id: "gallery", label: "Gallery", count: gallery.length, icon: Images },
     { id: "timeline", label: "Timeline", count: timeline.length, icon: Clock3 },
-    { id: "services", label: "Services", count: services.length, icon: ListChecks },
+    { id: "services", label: "Services", count: offerings.length, icon: ListChecks },
     { id: "rates", label: "Rates", icon: CalendarDays },
     { id: "reviews", label: "Reviews", count: reviews.length, icon: Star },
   ];
 
   return (
-    <div className="mt-5">
+    <div className="mt-4">
       <nav className="profile-section-nav" role="tablist" aria-label="Profile sections">
         {tabs.map((tab) => (
           <button
@@ -81,11 +103,7 @@ export default function PublicProfileSections({
           <p className="mt-5 max-w-3xl text-sm leading-7 text-white/75">
             {bio || "This member has not written a bio yet."}
           </p>
-          {interests.length > 0 && (
-            <div className="mt-5 flex flex-wrap gap-2">
-              {interests.map((interest) => <span key={interest} className="filter-chip text-white">{interest}</span>)}
-            </div>
-          )}
+
           <dl className="profile-detail-grid mt-7">
             {details.map((detail) => (
               <div key={detail.label} className="profile-detail-item">
@@ -103,10 +121,14 @@ export default function PublicProfileSections({
           <h2 className="font-display mt-1.5 text-2xl font-bold">Gallery</h2>
           {gallery.length > 0 ? (
             <div className="profile-tab-gallery mt-6">
-              {gallery.map((photo, index) => (
-                <div key={photo}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo} alt={`${profileName} gallery photo ${index + 1}`} loading="lazy" />
+              {gallery.map((item, index) => (
+                <div key={item}>
+                  {/\.(mp4|webm|mov)(\?|$)/i.test(item) ? (
+                    <video src={item} controls playsInline preload="metadata" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item} alt={`${profileName} gallery ${index + 1}`} loading="lazy" />
+                  )}
                 </div>
               ))}
             </div>
@@ -133,9 +155,9 @@ export default function PublicProfileSections({
         <section className="profile-detail-section mt-3" role="tabpanel">
           <p className="section-kicker">Bookings</p>
           <h2 className="font-display mt-1.5 text-2xl font-bold">Services</h2>
-          {services.length > 0 ? (
+          {offerings.length > 0 ? (
             <ul className="profile-service-list mt-6">
-              {services.map((service) => <li key={service.name}><CheckCircle2 className="h-4 w-4" /> {service.name}</li>)}
+              {offerings.map((service) => <li key={service.name}><CheckCircle2 className="h-4 w-4" /> {service.name}</li>)}
             </ul>
           ) : <p className="mt-4 text-sm text-muted">No published services yet.</p>}
         </section>
@@ -145,10 +167,10 @@ export default function PublicProfileSections({
         <section className="profile-detail-section mt-3" role="tabpanel">
           <p className="section-kicker">Pricing</p>
           <h2 className="font-display mt-1.5 text-2xl font-bold">Rates (NGN)</h2>
-          {services.length > 0 ? (
+          {rateRows.length > 0 ? (
             <div className="rates-table mt-6" role="table" aria-label="Published rates">
               <div className="rates-row rates-header" role="row"><span>Service</span><span>Incall</span><span>Outcall</span></div>
-              {services.map((service) => (
+              {rateRows.map((service) => (
                 <div key={service.name} className="rates-row" role="row">
                   <strong>{service.name}</strong><span>{formatNaira(service.incallRate)}</span><span>{formatNaira(service.outcallRate)}</span>
                 </div>
@@ -162,7 +184,7 @@ export default function PublicProfileSections({
         <section className="profile-detail-section mt-3" role="tabpanel">
           <div className="section-heading-row">
             <div><p className="section-kicker">Trust</p><h2 className="font-display mt-1.5 text-2xl font-bold">Reviews</h2></div>
-            {reviews.length > 0 && <strong className="profile-review-score"><Star className="h-4 w-4 fill-current" /> 4.7</strong>}
+            {reviews.length > 0 && <strong className="profile-review-score"><Star className="h-4 w-4 fill-current" /> {average || "—"}</strong>}
           </div>
           {reviews.length > 0 ? (
             <div className="profile-reviews mt-6">
@@ -178,6 +200,12 @@ export default function PublicProfileSections({
               ))}
             </div>
           ) : <p className="mt-4 text-sm text-muted">No public reviews yet.</p>}
+          <ReviewForm
+            authed={authed}
+            canReview={!isMine}
+            listingUserId={listingUserId}
+            onPosted={() => void loadReviews()}
+          />
         </section>
       )}
     </div>

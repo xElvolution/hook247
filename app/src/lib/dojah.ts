@@ -64,7 +64,9 @@ export function publicWidgetConfig() {
 /** Whether the browser has enough to render the widget. */
 export function widgetReady(): boolean {
   const c = publicWidgetConfig();
-  return Boolean(c.appId && c.publicKey && c.widgetId);
+  // widget_id is only required for a custom EasyOnboard flow. The built-in
+  // "verification" type launches with app id + public key alone.
+  return Boolean(c.appId && c.publicKey);
 }
 
 type DojahEvent = {

@@ -5,6 +5,7 @@ import { getSessionUserId } from "@/lib/session";
 import { ageFrom, getActiveSessionUserId } from "@/lib/user";
 import { VISIBLE_POST, VISIBLE_COMMENT, VISIBLE_PROFILE } from "@/lib/moderation";
 import { isMockUserId, mockFeed } from "@/lib/mock";
+import { feedBoards, primaryBoard } from "@/lib/feedBoards";
 
 /** Sidebar suggestions: verified and recently-active members come first. */
 async function recommendations(excludeUserId: string | null) {
@@ -56,15 +57,25 @@ export async function GET() {
   return NextResponse.json({
     guest: !userId,
     recommended,
-    posts: posts.map((p, index) => ({
+    posts: posts.map((p) => {
+      const views = p._count.likes * 11 + p._count.comments * 7;
+      const boards = feedBoards({
+        body: p.body,
+        videoUrl: p.videoUrl,
+        poll: null,
+        likeCount: p._count.likes,
+        commentCount: p._count.comments,
+        views,
+      });
+      return {
       id: p.id,
       body: p.body,
       imageUrl: p.imageUrl,
       videoUrl: p.videoUrl,
       posterUrl: "",
-      category: index % 4 === 0 ? "trending" : "explore",
-      views: 120 + p._count.likes * 11 + p._count.comments * 7,
-      poll: null,
+      category: primaryBoard(boards),
+      boards,
+      views,
       createdAt: p.createdAt,
       mine: p.authorId === userId,
       author: {
@@ -83,7 +94,8 @@ export async function GET() {
         author: c.author.profile?.displayName ?? "Member",
         avatarUrl: c.author.profile?.avatarUrl ?? "",
       })),
-    })),
+    };
+    }),
   });
 }
 
@@ -109,12 +121,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
+  const body = parsed.data.body.trim();
+  const boards = feedBoards({
+    body,
+    videoUrl: parsed.data.videoUrl,
+    likeCount: 0,
+    commentCount: 0,
+  });
   const post = await db.post.create({
     data: {
       authorId: userId,
-      body: parsed.data.body.trim(),
+      body,
       imageUrl: parsed.data.imageUrl,
       videoUrl: parsed.data.videoUrl,
+      category: primaryBoard(boards),
     },
   });
   return NextResponse.json({ ok: true, id: post.id });

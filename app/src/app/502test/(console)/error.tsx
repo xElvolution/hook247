@@ -47,7 +47,7 @@ export default function ConsoleError({
       </h2>
       <p className="mt-2 text-sm text-muted">
         The database didn&apos;t answer in time. This is usually a momentary
-        connection drop — try again.
+        connection drop. Try again.
       </p>
       {error.digest ? (
         <p className="mt-2 font-mono text-[11px] text-muted/70">

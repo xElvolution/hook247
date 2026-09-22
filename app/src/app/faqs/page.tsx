@@ -3,28 +3,28 @@ import { ArrowLeft } from "lucide-react";
 
 const FAQS = [
   {
-    q: "Is Hook247 free?",
-    a: "Yes — joining, swiping, matching and chatting are free. Premium (Plus/Elite) adds extras like seeing who liked you, unlimited likes and profile Boosts.",
+    q: "Is Hooks247 free?",
+    a: "Yes. Clients browse profiles with no account. Ladies create a profile for free. You only pay if you want a Boost or a paid featured profile.",
   },
   {
-    q: "How does matching work?",
-    a: "When you like someone and they like you back, it's a match — chat opens instantly for both of you. Nobody can message you without a mutual match.",
+    q: "How do I contact someone?",
+    a: "Open a profile and tap WhatsApp. There is no match wait. You chat on WhatsApp about availability and rates.",
   },
   {
     q: "What does the blue badge mean?",
-    a: "Verified members have confirmed they're a real person. Look for the badge before you meet anyone.",
+    a: "Verified profiles have confirmed they are a real person. Look for the badge before you meet anyone.",
   },
   {
     q: "What is a Boost?",
-    a: "A Boost puts your profile at the front of everyone's deck nearby, so you get seen (and liked) much faster. Available on Plus and Elite plans.",
+    a: "A Boost puts your profile at the front of search in your area so more clients see you first.",
   },
   {
-    q: "Who can join?",
-    a: "Adults 18 and over only. We verify age at signup and remove underage accounts immediately.",
+    q: "Who can create a profile?",
+    a: "Adults 18 and over only. We check age at signup and remove underage accounts immediately.",
   },
   {
     q: "How do I report someone?",
-    a: "Use the report option on any profile or message, or reach us via the Contact page. We review reports quickly and remove bad actors.",
+    a: "Use the report option on any profile, or reach us via the Contact page. We review reports quickly.",
   },
 ];
 

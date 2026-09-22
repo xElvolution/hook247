@@ -15,7 +15,7 @@ export default function ContactPage() {
         Get in <span className="text-gradient">touch</span>
       </h1>
       <p className="mt-3 text-muted">
-        Questions, feedback or something to report — we read everything.
+        Questions, feedback or something to report. We read everything.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">

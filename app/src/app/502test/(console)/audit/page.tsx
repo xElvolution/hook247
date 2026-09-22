@@ -166,7 +166,7 @@ export default async function AuditPage({
                   )}
 
                   {a.note ? (
-                    <span className="text-muted">— {a.note}</span>
+                    <span className="text-muted">: {a.note}</span>
                   ) : null}
                 </div>
               );

@@ -60,12 +60,12 @@ export default function LikesPage() {
       ) : guest ? (
         <div className="glass flex flex-col items-center rounded-3xl p-10 text-center">
           <Heart className="h-10 w-10 text-[#ff5d52]" strokeWidth={1.5} />
-          <p className="font-display mt-4 font-bold">Someone could be liking you right now</p>
+          <p className="font-display mt-4 font-bold">Browse profiles, no account needed</p>
           <p className="mt-2 max-w-xs text-sm text-muted">
-            Create a free profile and start collecting likes tonight.
+            Profiles are public. WhatsApp a profile, or create your own.
           </p>
           <Link href="/signup" className="btn-primary mt-6 text-sm">
-            Join free
+            Browse profiles
           </Link>
         </div>
       ) : locked ? (

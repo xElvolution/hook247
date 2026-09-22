@@ -95,6 +95,29 @@ export function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
+export function AdminBtn({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "good" | "warn" | "bad";
+}) {
+  const cls = {
+    default: "border-line text-muted hover:text-ink",
+    good: "border-good/40 text-good hover:bg-good/10",
+    warn: "border-amber-400/40 text-amber-300 hover:bg-amber-400/10",
+    bad: "border-red-500/40 text-red-300 hover:bg-red-500/10",
+  }[tone];
+  return (
+    <button
+      type="submit"
+      className={`rounded border px-2.5 py-1.5 text-xs font-semibold transition ${cls}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 /**
  * Minimal bar chart. Deliberately CSS-only — a charting dependency would be
  * the heaviest thing in the bundle for six bars behind a password.

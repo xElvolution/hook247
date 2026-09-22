@@ -10,9 +10,9 @@ export default async function OverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold">Overview</h1>
+        <h1 className="font-display text-2xl font-bold">Admin overview</h1>
         <p className="mt-1 text-sm text-muted">
-          Last 30 days unless noted.
+          Control profiles, plans, payouts and reports from this console. Last 30 days unless noted.
         </p>
       </div>
 
@@ -52,7 +52,7 @@ export default async function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Signups — 30 days">
+        <Panel title="Signups (30 days)">
           <Bars
             data={s.signupSeries.map((d) => ({ day: d.day, value: d.n }))}
             format={(v) => `${v} signup${v === 1 ? "" : "s"}`}
@@ -62,7 +62,7 @@ export default async function OverviewPage() {
           </p>
         </Panel>
 
-        <Panel title="Revenue — 30 days">
+        <Panel title="Revenue (30 days)">
           <Bars
             data={s.revenueSeries.map((d) => ({ day: d.day, value: d.kobo }))}
             format={naira}

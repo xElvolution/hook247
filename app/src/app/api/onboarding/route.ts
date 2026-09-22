@@ -4,15 +4,19 @@ import { db } from "@/lib/db";
 import {
   BUILD_OPTIONS,
   EDUCATION_OPTIONS,
+  BUST_OPTIONS,
   ETHNICITY_OPTIONS,
   ORIENTATION_OPTIONS,
-  SERVICE_OPTIONS,
+  ALL_OFFERS,
   SMOKING_OPTIONS,
+  THIGH_OPTIONS,
+  isRatePackage,
   citiesFor,
   statesFor,
 } from "@/lib/profileOptions";
 import { getSessionUserId } from "@/lib/session";
 import { ageFrom, getActiveSessionUserId } from "@/lib/user";
+import { normalizeWhatsApp } from "@/lib/whatsapp";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -36,41 +40,76 @@ const schema = z
     gender: z.enum(["MALE", "FEMALE", "NONBINARY"]),
     lookingFor: z.array(z.enum(["MALE", "FEMALE", "NONBINARY"])).min(1),
     bio: z.string().max(500).default(""),
-    country: z.string().min(1).max(60),
-    state: z.string().min(1).max(60),
-    city: z.string().min(1).max(60),
+    country: z.string().min(1).max(80),
+    state: z.string().min(1).max(80),
+    city: z.string().min(1).max(80),
     ethnicity: z.enum(ETHNICITY_OPTIONS),
     bodyBuild: z.enum(BUILD_OPTIONS),
+    bustSize: z.enum(BUST_OPTIONS).or(z.literal("")).default(""),
+    thighs: z.enum(THIGH_OPTIONS).or(z.literal("")).default(""),
     education: z.enum(EDUCATION_OPTIONS),
     smoking: z.enum(SMOKING_OPTIONS),
     orientation: z.enum(ORIENTATION_OPTIONS),
     availableToday: z.boolean().default(false),
     interests: z.array(z.string().max(30)).max(10).default([]),
     avatarUrl: z.string().default(""),
+    photos: z.array(z.string().max(500)).max(12).default([]),
+    clips: z.array(z.string().max(500)).max(6).default([]),
+    role: z.enum(["ESCORT", "CLIENT"]).default("ESCORT"),
+    phoneCountry: z.string().min(1).max(80).optional(),
+    whatsapp: z.string().max(20).default(""),
     services: z
       .array(
         z.object({
-          name: z.enum(SERVICE_OPTIONS),
+          name: z.enum(ALL_OFFERS),
           incallRate: z.number().int().positive().nullable(),
           outcallRate: z.number().int().positive().nullable(),
           enabled: z.boolean(),
         })
       )
-      .max(SERVICE_OPTIONS.length)
+      .max(ALL_OFFERS.length)
       .default([]),
   })
   .superRefine((data, ctx) => {
-    if (!statesFor(data.country).includes(data.state)) {
+    const knownStates = statesFor(data.country);
+    if (knownStates.length > 0 && !knownStates.includes(data.state)) {
       ctx.addIssue({ code: "custom", path: ["state"], message: "Choose a valid state" });
     }
-    if (!citiesFor(data.country, data.state).includes(data.city)) {
+    const knownCities = citiesFor(data.country, data.state);
+    if (knownCities.length > 0 && !knownCities.includes(data.city)) {
       ctx.addIssue({ code: "custom", path: ["city"], message: "Choose a valid city" });
     }
-    if (data.services.some((service) => service.enabled && !service.incallRate && !service.outcallRate)) {
+    if (data.role === "ESCORT" && !data.bustSize) {
+      ctx.addIssue({ code: "custom", path: ["bustSize"], message: "Choose bust size" });
+    }
+    if (data.role === "ESCORT" && !data.thighs) {
+      ctx.addIssue({ code: "custom", path: ["thighs"], message: "Choose thighs" });
+    }
+    if (data.role === "ESCORT" && !normalizeWhatsApp(data.whatsapp, data.phoneCountry || data.country)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["whatsapp"],
+        message: "Enter a valid WhatsApp number for that country code",
+      });
+    }
+    if (
+      data.role === "ESCORT" &&
+      !data.services.some((service) => service.enabled && !isRatePackage(service.name))
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["services"],
-        message: "Each enabled service needs at least one rate",
+        message: "Pick at least one service for your profile",
+      });
+    }
+    const packages = data.services.filter(
+      (service) => isRatePackage(service.name) && (service.incallRate || service.outcallRate)
+    );
+    if (data.role === "ESCORT" && packages.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["services"],
+        message: "Set a Short time, Overnight or Weekend rate",
       });
     }
   });
@@ -113,14 +152,20 @@ export async function POST(req: Request) {
       city: data.city,
       ethnicity: data.ethnicity,
       bodyBuild: data.bodyBuild,
+      bustSize: data.bustSize,
+      thighs: data.thighs,
       education: data.education,
       smoking: data.smoking,
       orientation: data.orientation,
       availableToday: data.availableToday,
       interests: data.interests,
       avatarUrl,
+      photos: data.photos,
+      clips: data.clips,
+      role: data.role,
+      whatsapp: data.role === "ESCORT" ? normalizeWhatsApp(data.whatsapp, data.phoneCountry || data.country) : "",
       services: {
-        create: data.services.filter((service) => service.enabled),
+        create: data.role === "ESCORT" ? data.services.filter((service) => service.enabled) : [],
       },
     },
     update: {
@@ -134,15 +179,21 @@ export async function POST(req: Request) {
       city: data.city,
       ethnicity: data.ethnicity,
       bodyBuild: data.bodyBuild,
+      bustSize: data.bustSize,
+      thighs: data.thighs,
       education: data.education,
       smoking: data.smoking,
       orientation: data.orientation,
       availableToday: data.availableToday,
       interests: data.interests,
       avatarUrl,
+      photos: data.photos,
+      clips: data.clips,
+      role: data.role,
+      whatsapp: data.role === "ESCORT" ? normalizeWhatsApp(data.whatsapp, data.phoneCountry || data.country) : "",
       services: {
         deleteMany: {},
-        create: data.services.filter((service) => service.enabled),
+        create: data.role === "ESCORT" ? data.services.filter((service) => service.enabled) : [],
       },
     },
     include: { services: true },

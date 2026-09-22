@@ -111,7 +111,7 @@ export default function SearchFiltersModal({
                 </select>
               </label>
               <label className="filter-control">
-                <span>City / area</span>
+                <span>City / area / LGA</span>
                 <select
                   value={draft.city}
                   disabled={!draft.state}

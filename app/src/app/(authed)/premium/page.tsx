@@ -6,7 +6,12 @@ import { fulfilPayment } from "@/lib/fulfilPayment";
 import { publicWidgetConfig } from "@/lib/dojah";
 import { isMockUserId, mockCurrentUser } from "@/lib/mock";
 
-export const metadata = { title: "Premium | Hook247" };
+export const metadata = { title: "Premium | Hooks247" };
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
 
 export default async function PremiumPage({
   searchParams,
@@ -17,15 +22,11 @@ export default async function PremiumPage({
   if (!userId) redirect("/login?next=/premium");
 
   const params = await searchParams;
-  const reference =
-    typeof params.reference === "string" ? params.reference : "";
+  const reference = firstParam(params.reference) || firstParam(params.trxref);
+  const paidReturn = Boolean(reference) || firstParam(params.status) === "success";
 
-  // Paystack redirects here after checkout. Completing the purchase from the
-  // callback too means it activates even when the webhook cannot reach us
-  // (local development, or a webhook outage). fulfilPayment is idempotent, so
-  // whichever path arrives second is a no-op.
   let justPaid = false;
-  if (params.status === "success" && reference) {
+  if (reference) {
     try {
       const result = await fulfilPayment(reference);
       justPaid = result.ok;
@@ -43,26 +44,50 @@ export default async function PremiumPage({
         verified={mock.verified}
         paymentPending={false}
         paymentComplete={false}
+        subscriptionLabel=""
         dojah={publicWidgetConfig()}
       />
     );
   }
 
-  // Read the profile after fulfilment so the page shows the upgraded plan.
-  const profile = await db.profile.findUnique({
-    where: { userId },
-    select: { plan: true, verified: true },
-  });
-  if (!profile) redirect("/onboarding");
+  try {
+    const profile = await db.profile.findUnique({
+      where: { userId },
+      select: { plan: true, verified: true, subscriptionExpiresAt: true, subscriptionPlanSlug: true },
+    });
+    if (!profile) redirect("/onboarding");
 
-  return (
-    <PremiumPlans
-      userId={userId}
-      currentPlan={profile.plan}
-      verified={profile.verified}
-      paymentPending={params.status === "success" && !justPaid}
-      paymentComplete={justPaid}
-      dojah={publicWidgetConfig()}
-    />
-  );
+    const active = profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > new Date();
+    const until = profile.subscriptionExpiresAt
+      ? profile.subscriptionExpiresAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : "";
+    const subscriptionLabel = active
+      ? `Live until ${until}.`
+      : "Your profile is hidden until a plan is active.";
+
+    return (
+      <PremiumPlans
+        userId={userId}
+        currentPlan={profile.plan}
+        verified={profile.verified}
+        paymentPending={paidReturn && !justPaid}
+        paymentComplete={justPaid || Boolean(active && paidReturn)}
+        subscriptionLabel={subscriptionLabel}
+        dojah={publicWidgetConfig()}
+      />
+    );
+  } catch (err) {
+    console.error("Premium page failed:", err);
+    return (
+      <PremiumPlans
+        userId={userId}
+        currentPlan="FREE"
+        verified={false}
+        paymentPending={paidReturn && !justPaid}
+        paymentComplete={justPaid}
+        subscriptionLabel={justPaid ? "Payment received. Your profile is updating." : "Pay to activate your profile."}
+        dojah={publicWidgetConfig()}
+      />
+    );
+  }
 }

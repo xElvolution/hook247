@@ -45,10 +45,10 @@ export default function MatchesPage() {
           <HeartHandshake className="h-10 w-10 text-[#ff5d52]" strokeWidth={1.5} />
           <p className="font-display mt-4 font-bold">Your matches will live here</p>
           <p className="mt-2 text-sm text-muted">
-            Join free, like a few people, and chat opens the moment it&apos;s mutual.
+            Profiles are public. WhatsApp a profile, or create your own.
           </p>
           <Link href="/signup" className="btn-primary mt-6 text-sm">
-            Join free
+            Browse profiles
           </Link>
         </div>
       ) : matches.length === 0 ? (
@@ -56,7 +56,7 @@ export default function MatchesPage() {
           <HeartHandshake className="h-10 w-10 text-[#ff5d52]" strokeWidth={1.5} />
           <p className="font-display mt-4 font-bold">No matches yet</p>
           <p className="mt-2 text-sm text-muted">
-            Keep swiping — when you both like each other, they show up here.
+            Keep swiping. When you both like each other, they show up here.
           </p>
           <Link href="/discover" className="btn-primary mt-6 text-sm">
             Go discover
@@ -92,7 +92,7 @@ export default function MatchesPage() {
                   <p className="truncate text-sm text-muted">
                     {m.lastMessage
                       ? `${m.lastMessage.mine ? "You: " : ""}${m.lastMessage.body}`
-                      : "New match — say hi!"}
+                      : "New match. Say hi!"}
                   </p>
                 </div>
                 {!m.lastMessage && (

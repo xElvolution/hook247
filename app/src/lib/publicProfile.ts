@@ -11,9 +11,13 @@ export type PublicProfile = {
   bio: string;
   avatarUrl: string;
   photos: string[];
+  clips: string[];
+  whatsapp: string;
   interests: string[];
   ethnicity: string;
   bodyBuild: string;
+  bustSize: string;
+  thighs: string;
   education: string;
   smoking: string;
   orientation: string;

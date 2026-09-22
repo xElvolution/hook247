@@ -46,7 +46,7 @@ export default function ReportButton({
       setError(data.error ?? "The report could not be sent.");
       return;
     }
-    setDone(data.message ?? "Thanks — our team will review this.");
+    setDone(data.message ?? "Thanks. Our team will review this.");
     setOpen(false);
   }
 

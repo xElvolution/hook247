@@ -2,16 +2,17 @@ import type { Prisma } from "@prisma/client";
 
 /**
  * Shared moderation filters. Every public query composes these rather than
- * writing `bannedAt: null` inline, so a new listing page cannot forget to
+ * writing `bannedAt: null` inline, so a new profile page cannot forget to
  * exclude banned accounts and taken-down posts.
  */
 
 /** Users an admin has not banned. */
 export const ACTIVE_USER: Prisma.UserWhereInput = { bannedAt: null };
 
-/** Profiles whose owning account is in good standing. */
+/** Profiles whose owning account is in good standing and not taken down. */
 export const VISIBLE_PROFILE: Prisma.ProfileWhereInput = {
   user: { bannedAt: null },
+  adminHidden: false,
 };
 
 /** Posts that are neither taken down nor authored by a banned account. */

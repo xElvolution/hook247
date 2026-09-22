@@ -3,28 +3,17 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
-import { initializeTransaction, PAYSTACK_PUBLIC_KEY } from "@/lib/paystack";
-
-const PRICES = {
-  PLAN_PLUS: 250_000, // ₦2,500 in kobo
-  PLAN_ELITE: 600_000, // ₦6,000 in kobo
-  BOOST: 150_000, // ₦1,500 in kobo (requires Plus/Elite)
-  VERIFICATION: 200_000, // ₦2,000 in kobo
-} as const;
+import { initializeTransaction } from "@/lib/paystack";
+import { requestAppUrl } from "@/lib/publicUrl";
+import { ensureCatalog, isSubscriptionActive } from "@/lib/money";
 
 const schema = z.object({
   action: z.enum(["checkout"]),
-  purpose: z.enum(["PLAN_PLUS", "PLAN_ELITE", "BOOST", "VERIFICATION"]),
+  kind: z.enum(["plan", "boost"]),
+  productId: z.string().min(1),
 });
 
-/**
- * POST /api/premium — create a Paystack checkout session.
- * The user is redirected to Paystack to pay. Paystack then hits our webhook
- * which fulfills the purchase and marks the Payment row SUCCESS.
- */
 export async function POST(req: Request) {
-  // A banned account must not be able to start a checkout — taking money for a
-  // benefit it cannot use would mean issuing a refund later.
   const userId = await getActiveSessionUserId();
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
@@ -32,8 +21,8 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
-  const { purpose } = parsed.data;
 
+  await ensureCatalog();
   const profile = await db.profile.findUnique({
     where: { userId },
     include: { user: true },
@@ -42,31 +31,48 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No profile found" }, { status: 400 });
   }
 
-  // Boost requires Plus or Elite.
-  if (purpose === "BOOST" && profile.plan === "FREE") {
-    return NextResponse.json(
-      { error: "Boost is a Plus/Elite feature. Upgrade first." },
-      { status: 403 }
-    );
+  let amountKobo = 0;
+  let purpose: "SUBSCRIPTION" | "BOOST" = "SUBSCRIPTION";
+  let label = "plan";
+
+  if (parsed.data.kind === "plan") {
+    const plan = await db.subscriptionPlan.findFirst({
+      where: { id: parsed.data.productId, active: true },
+    });
+    if (!plan) return NextResponse.json({ error: "Plan not available" }, { status: 400 });
+    amountKobo = plan.priceKobo;
+    purpose = "SUBSCRIPTION";
+    label = plan.slug;
+  } else {
+    if (!isSubscriptionActive(profile.subscriptionExpiresAt)) {
+      return NextResponse.json(
+        { error: "Buy a profile plan before boosting." },
+        { status: 403 }
+      );
+    }
+    const boost = await db.boostProduct.findFirst({
+      where: { id: parsed.data.productId, active: true },
+    });
+    if (!boost) return NextResponse.json({ error: "Boost not available" }, { status: 400 });
+    amountKobo = boost.priceKobo;
+    purpose = "BOOST";
+    label = boost.slug;
   }
 
-  const amountKobo = PRICES[purpose];
-  const reference = `hook247_${purpose.toLowerCase()}_${randomUUID()}`;
-
-  // Create the pending Payment row before redirecting to Paystack.
+  const reference = `hook247_${label}_${randomUUID()}`;
   const payment = await db.payment.create({
     data: {
       userId,
       reference,
       purpose,
+      productId: parsed.data.productId,
       amountKobo,
       status: "PENDING",
     },
   });
 
-  // Initialize the transaction with Paystack.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
-  const callbackUrl = `${appUrl}/premium?status=success&reference=${reference}`;
+  const appUrl = requestAppUrl(req);
+  const callbackUrl = `${appUrl}/premium`;
 
   try {
     const init = await initializeTransaction(
@@ -80,7 +86,6 @@ export async function POST(req: Request) {
       reference: init.reference,
     });
   } catch (err) {
-    // Paystack never saw this reference, so the row would sit PENDING forever.
     console.error("Paystack initialize failed:", err);
     await db.payment.update({
       where: { id: payment.id },
@@ -91,9 +96,4 @@ export async function POST(req: Request) {
       { status: 502 }
     );
   }
-}
-
-/** GET /api/premium — return Paystack public key for client-side SDK. */
-export async function GET() {
-  return NextResponse.json({ publicKey: PAYSTACK_PUBLIC_KEY });
 }

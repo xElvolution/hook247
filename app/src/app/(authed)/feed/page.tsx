@@ -32,6 +32,7 @@ type FeedPost = {
   videoUrl: string;
   posterUrl: string;
   category: FeedCategory;
+  boards?: FeedCategory[];
   views: number;
   poll: null | { question: string; options: { label: string; votes: number }[] };
   createdAt: string;
@@ -132,7 +133,9 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
     setPollChoice(index);
   }
 
-  const category = TABS.find((tab) => tab.id === post.category)!;
+  const boards = post.boards?.length ? post.boards : [post.category || "explore"];
+  const badgeId = boards.find((id) => id !== "explore") ?? "explore";
+  const category = TABS.find((tab) => tab.id === badgeId) ?? TABS[1];
   const totalVotes = post.poll?.options.reduce((sum, option) => sum + option.votes, 0) ?? 0;
 
   return (
@@ -154,9 +157,11 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
           </Link>
           <p>{timeAgo(post.createdAt)} ago</p>
         </div>
-        <span className="pulse-category" data-category={post.category}>
-          <category.icon className="h-3.5 w-3.5" /> {category.label}
-        </span>
+        {badgeId !== "explore" ? (
+          <span className="pulse-category" data-category={badgeId}>
+            <category.icon className="h-3.5 w-3.5" /> {category.label}
+          </span>
+        ) : null}
       </header>
 
       <p className="pulse-post-copy">{post.body}</p>
@@ -248,7 +253,7 @@ export default function FeedPage() {
   const [recommended, setRecommended] = useState<RecommendedProfile[]>([]);
   const [guest, setGuest] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<FeedCategory>("trending");
+  const [activeTab, setActiveTab] = useState<FeedCategory>("explore");
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -287,15 +292,27 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") as FeedCategory | null;
+    if (tab && TABS.some((item) => item.id === tab)) {
+      setActiveTab(tab);
+    }
+    if (params.get("compose") === "1") {
+      document.getElementById("feed-composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.querySelector<HTMLTextAreaElement>("#feed-composer textarea")?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
-  const visiblePosts = useMemo(
-    () => posts.filter((post) => post.category === activeTab),
-    [activeTab, posts]
-  );
+  const visiblePosts = useMemo(() => {
+    if (activeTab === "explore") return posts;
+    return posts.filter((post) => (post.boards ?? [post.category]).includes(activeTab));
+  }, [activeTab, posts]);
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -365,21 +382,34 @@ export default function FeedPage() {
         <div className="section-heading-row items-end">
           <div>
             <p className="section-kicker"><Sparkles className="h-3.5 w-3.5" /> Community</p>
-            <h1 className="font-display mt-2 text-3xl font-extrabold">Hook247 Pulse</h1>
+            <h1 className="font-display mt-2 text-xl font-extrabold sm:text-2xl">Hooks247 Pulse</h1>
           </div>
           <span className="text-xs text-muted">Fresh from the community</span>
         </div>
 
-        <div className="pulse-tabs mt-5" role="tablist" aria-label="Feed categories">
+        <div className="pulse-tabs mt-4" role="tablist" aria-label="Feed categories">
           {TABS.map((tab) => (
-            <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} data-active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
-              <tab.icon className="h-4 w-4" /> {tab.label}
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              data-active={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <tab.icon className="h-3.5 w-3.5" /> {tab.label}
             </button>
           ))}
         </div>
+        <p className="pulse-tab-hint">
+          {activeTab === "explore" && "Explore is every post."}
+          {activeTab === "trending" && "Trending is posts people are checking and liking."}
+          {activeTab === "erotica" && "Erotica is videos or posts with spicy wording."}
+          {activeTab === "poll" && "Polls are posts that ask a question."}
+        </p>
 
-        <form onSubmit={publish} className="pulse-composer mt-5">
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hook247 to share an update" : "Share what is happening"} />
+        <form id="feed-composer" onSubmit={publish} className="pulse-composer mt-4">
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hooks247 to share an update" : "Share what is happening"} />
           {previewUrl && (
             <div className="pulse-upload-preview">
               {mediaKind === "video" ? <video src={previewUrl} controls playsInline /> : (
@@ -417,15 +447,21 @@ export default function FeedPage() {
         ) : (
           <div className="empty-panel mt-5 flex min-h-56 flex-col items-center justify-center px-6 text-center">
             <Users className="h-8 w-8 text-[#df3a6a]" />
-            <h2 className="font-display mt-3 font-bold">Nothing posted here yet</h2>
-            <button type="button" className="section-link mt-3" onClick={() => setActiveTab("trending")}>Back to trending</button>
+            <h2 className="font-display mt-3 font-bold">Nothing in {TABS.find((tab) => tab.id === activeTab)?.label} yet</h2>
+            <p className="mt-2 text-sm text-muted">
+              {activeTab === "trending" && "A post lands here after people like and comment on it."}
+              {activeTab === "erotica" && "Add a video or spicy text and it shows here automatically."}
+              {activeTab === "poll" && "Ask a question in your post and it shows here."}
+              {activeTab === "explore" && "Be the first to post."}
+            </p>
+            <button type="button" className="section-link mt-3" onClick={() => setActiveTab("explore")}>Open Explore</button>
           </div>
         )}
       </main>
 
       <aside className="pulse-sidebar">
         <section>
-          <div className="pulse-sidebar-heading"><span><Radio className="h-4 w-4 text-emerald-400" /> Live on Hook247</span><Link href="/discover">See all</Link></div>
+          <div className="pulse-sidebar-heading"><span><Radio className="h-4 w-4 text-emerald-400" /> Live on Hooks247</span><Link href="/live">See all</Link></div>
           <div className="pulse-live-list">
             {liveProfiles.map((profile) => (
               <Link key={profile.userId} href={`/live/${encodeURIComponent(profile.userId)}`}>

@@ -34,7 +34,7 @@ export async function banUser(formData: FormData) {
   });
 
   await logAdminAction("user.ban", "user", userId, reason);
-  revalidatePath("/502test/users");
+  revalidateUser(userId);
 }
 
 export async function unbanUser(formData: FormData) {
@@ -47,7 +47,7 @@ export async function unbanUser(formData: FormData) {
     data: { bannedAt: null, banReason: "", suspendedUntil: null },
   });
   await logAdminAction("user.unban", "user", userId);
-  revalidatePath("/502test/users");
+  revalidateUser(userId);
 }
 
 export async function suspendUser(formData: FormData) {
@@ -66,7 +66,7 @@ export async function suspendUser(formData: FormData) {
     data: { isLive: false, availableToday: false },
   });
   await logAdminAction("user.suspend", "user", userId, `${days}d`);
-  revalidatePath("/502test/users");
+  revalidateUser(userId);
 }
 
 export async function hidePost(formData: FormData) {
@@ -133,7 +133,7 @@ export async function approveVerification(formData: FormData) {
     },
   });
   await logAdminAction("verification.approve", "user", userId, note);
-  revalidatePath("/502test/verification");
+  revalidateUser(userId);
 }
 
 export async function revokeVerification(formData: FormData) {
@@ -152,7 +152,7 @@ export async function revokeVerification(formData: FormData) {
     },
   });
   await logAdminAction("verification.revoke", "user", userId, note);
-  revalidatePath("/502test/verification");
+  revalidateUser(userId);
 }
 
 export async function setPlan(formData: FormData) {
@@ -164,7 +164,7 @@ export async function setPlan(formData: FormData) {
 
   await db.profile.update({ where: { userId }, data: { plan } });
   await logAdminAction("user.setplan", "user", userId, plan);
-  revalidatePath("/502test/users");
+  revalidateUser(userId);
 }
 
 /**
@@ -185,4 +185,104 @@ export async function retryPayment(formData: FormData) {
     result.ok ? result.state : `${result.state}: ${result.error}`
   );
   revalidatePath("/502test/payments");
+}
+
+function revalidateUser(userId: string) {
+  revalidatePath("/502test/users");
+  revalidatePath(`/502test/users/${userId}`);
+  revalidatePath("/502test/profiles");
+  revalidatePath("/502test/verification");
+  revalidatePath("/");
+}
+
+function revalidateProfiles() {
+  revalidatePath("/502test/users");
+  revalidatePath("/502test/profiles");
+  revalidatePath("/502test/verification");
+  revalidatePath("/");
+}
+
+export async function grantSubscription(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const days = Math.max(1, Math.min(365, Number(formData.get("days") ?? 30) || 30));
+  if (!userId) return;
+
+  const profile = await db.profile.findUnique({ where: { userId } });
+  if (!profile) return;
+
+  const now = new Date();
+  const base =
+    profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > now
+      ? profile.subscriptionExpiresAt
+      : now;
+  const expires = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+  await db.profile.update({
+    where: { userId },
+    data: {
+      plan: days >= 90 ? "ELITE" : "PLUS",
+      subscriptionExpiresAt: expires,
+      subscriptionPlanSlug: days >= 90 ? "quarterly" : "monthly",
+      adminHidden: false,
+    },
+  });
+  await logAdminAction("user.grant", "user", userId, `${days}d`);
+  revalidateUser(userId);
+}
+
+export async function grantBoost(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const hours = Math.max(1, Math.min(24 * 60, Number(formData.get("hours") ?? 168) || 168));
+  if (!userId) return;
+
+  const profile = await db.profile.findUnique({ where: { userId } });
+  if (!profile) return;
+
+  const now = new Date();
+  const base = profile.boostedUntil && profile.boostedUntil > now ? profile.boostedUntil : now;
+  const until = new Date(base.getTime() + hours * 60 * 60 * 1000);
+  await db.profile.update({
+    where: { userId },
+    data: { boostedAt: now, boostedUntil: until, adminHidden: false },
+  });
+  await logAdminAction("user.boost", "user", userId, `${hours}h`);
+  revalidateUser(userId);
+}
+
+export async function hideProfile(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return;
+  await db.profile.update({
+    where: { userId },
+    data: { adminHidden: true, isLive: false, availableToday: false },
+  });
+  await logAdminAction("user.hide", "user", userId);
+  revalidateUser(userId);
+}
+
+export async function showProfile(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return;
+  await db.profile.update({
+    where: { userId },
+    data: { adminHidden: false },
+  });
+  await logAdminAction("user.show", "user", userId);
+  revalidateUser(userId);
+}
+
+export async function setLive(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const live = String(formData.get("live") ?? "") === "1";
+  if (!userId) return;
+  await db.profile.update({
+    where: { userId },
+    data: { isLive: live },
+  });
+  await logAdminAction(live ? "user.live.on" : "user.live.off", "user", userId);
+  revalidateUser(userId);
 }

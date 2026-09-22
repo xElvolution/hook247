@@ -6,6 +6,8 @@ import { getActiveSessionUserId } from "@/lib/user";
 
 const FILE_TYPES: Record<string, { extension: string; kind: "image" | "video" }> = {
   "image/jpeg": { extension: "jpg", kind: "image" },
+  "image/jpg": { extension: "jpg", kind: "image" },
+  "image/pjpeg": { extension: "jpg", kind: "image" },
   "image/png": { extension: "png", kind: "image" },
   "image/webp": { extension: "webp", kind: "image" },
   "image/gif": { extension: "gif", kind: "image" },
@@ -13,6 +15,19 @@ const FILE_TYPES: Record<string, { extension: string; kind: "image" | "video" }>
   "video/webm": { extension: "webm", kind: "video" },
   "video/quicktime": { extension: "mov", kind: "video" },
 };
+
+function sniffFile(file: File) {
+  if (FILE_TYPES[file.type]) return FILE_TYPES[file.type];
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return FILE_TYPES["image/jpeg"];
+  if (name.endsWith(".png")) return FILE_TYPES["image/png"];
+  if (name.endsWith(".webp")) return FILE_TYPES["image/webp"];
+  if (name.endsWith(".gif")) return FILE_TYPES["image/gif"];
+  if (name.endsWith(".mp4")) return FILE_TYPES["video/mp4"];
+  if (name.endsWith(".webm")) return FILE_TYPES["video/webm"];
+  if (name.endsWith(".mov")) return FILE_TYPES["video/quicktime"];
+  return null;
+}
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -26,9 +41,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose an image or video" }, { status: 400 });
   }
 
-  const fileType = FILE_TYPES[file.type];
+  const fileType = sniffFile(file);
   if (!fileType) {
-    return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
+    return NextResponse.json(
+      { error: "Use a JPG, PNG or WEBP photo. iPhone: choose Most Compatible, not HEIC." },
+      { status: 415 }
+    );
   }
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: "Uploads must be 20 MB or smaller" }, { status: 413 });

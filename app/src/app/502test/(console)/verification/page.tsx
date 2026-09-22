@@ -12,14 +12,16 @@ export default async function VerificationPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const params = await searchParams;
-  const filter = params.filter ?? "paid";
+  const filter = params.filter ?? "pending";
 
   const where =
-    filter === "paid"
-      ? { verified: true, verifiedSource: VerificationSource.PAID }
-      : filter === "reviewed"
-        ? { verifiedSource: VerificationSource.REVIEWED }
-        : { verified: true };
+    filter === "pending"
+      ? { verified: false, role: "ESCORT" as const }
+      : filter === "paid"
+        ? { verified: true, verifiedSource: VerificationSource.PAID }
+        : filter === "reviewed"
+          ? { verifiedSource: VerificationSource.REVIEWED }
+          : { verified: true };
 
   const profiles = await db.profile.findMany({
     where,
@@ -35,12 +37,12 @@ export default async function VerificationPage({
       <div>
         <h1 className="font-display text-2xl font-bold">Verification</h1>
         <p className="mt-1 text-sm text-muted">
-          Paid = bought the badge with no review. Reviewed = you approved it.
+          Pending = not yet verified. Paid = bought the badge. Reviewed = you approved it.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {["paid", "reviewed", "all"].map((f) => (
+        {["pending", "paid", "reviewed", "all"].map((f) => (
           <Link
             key={f}
             href={`/502test/verification?filter=${f}`}
