@@ -6,7 +6,6 @@ import GoLiveStudio from "@/components/live/GoLiveStudio";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
 import { getActiveSessionForHost, liveConfigured } from "@/lib/live";
-import { getCoinSettings } from "@/lib/coins";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Go live | Hooks247" };
@@ -53,13 +52,12 @@ export default async function GoLivePage() {
     return <Notice title="Live is temporarily unavailable" body="Streaming is being set up. Please try again shortly." avatarUrl={profile.avatarUrl} />;
   }
 
-  const [active, settings] = await Promise.all([getActiveSessionForHost(userId), getCoinSettings()]);
+  const active = await getActiveSessionForHost(userId);
   return (
     <GoLiveStudio
       hostId={userId}
       displayName={profile.displayName}
       avatarUrl={profile.avatarUrl}
-      payoutKoboPerCoin={settings.payoutKoboPerCoin}
       resume={active ? { id: active.id, title: active.title, startedAt: active.startedAt.toISOString() } : null}
     />
   );

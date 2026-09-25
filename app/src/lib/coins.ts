@@ -13,7 +13,7 @@ import { db } from "./db";
 export class CoinError extends Error {
   constructor(
     message: string,
-    public code: "INSUFFICIENT" | "INVALID" | "NOT_ALLOWED" | "NOT_FOUND" | "STATE"
+    public code: "INSUFFICIENT" | "INVALID" | "NOT_ALLOWED" | "NOT_FOUND" | "STATE" | "CHANGED"
   ) {
     super(message);
   }
@@ -250,6 +250,38 @@ export async function sendTip(input: {
 
 // ---------------------------------------------------------------- withdrawals
 
+/**
+ * Check a withdrawal amount and work out what it pays. Shared by the quote
+ * shown in the confirm step and the request itself, so the figure the escort
+ * confirms is computed exactly the way the stored payout is.
+ */
+async function checkWithdrawal(userId: string, requested: number) {
+  const coins = Math.floor(requested);
+  const settings = await getCoinSettings();
+  if (!Number.isFinite(coins) || coins < settings.minWithdrawalCoins) {
+    throw new CoinError(`The minimum withdrawal is ${settings.minWithdrawalCoins.toLocaleString("en-NG")} coins`, "INVALID");
+  }
+  const profile = await db.profile.findUnique({ where: { userId }, select: { role: true } });
+  if (profile?.role !== "ESCORT") throw new CoinError("Withdrawals are for escort accounts", "NOT_ALLOWED");
+
+  const open = await db.coinWithdrawal.count({
+    where: { userId, status: { in: ["REQUESTED", "APPROVED"] } },
+  });
+  if (open > 0) throw new CoinError("You already have a withdrawal being processed", "STATE");
+
+  const wallet = await getWallet(userId);
+  if (coins > wallet.balance) {
+    throw new CoinError(`You only have ${wallet.balance.toLocaleString("en-NG")} coins available`, "INSUFFICIENT");
+  }
+  return { coins, amountKobo: coins * settings.payoutKoboPerCoin, balance: wallet.balance };
+}
+
+/** What a withdrawal of `coins` would pay right now. Nothing is moved. */
+export async function quoteWithdrawal(userId: string, coins: number) {
+  const { amountKobo, balance, coins: whole } = await checkWithdrawal(userId, coins);
+  return { coins: whole, amountKobo, balance };
+}
+
 export async function requestWithdrawal(input: {
   userId: string;
   coins: number;
@@ -257,21 +289,13 @@ export async function requestWithdrawal(input: {
   bankName: string;
   accountNumber: string;
   accountName: string;
+  /** The amount the escort confirmed. If the rate changed since the quote, the request is refused. */
+  expectedAmountKobo?: number;
 }) {
-  const coins = Math.floor(input.coins);
-  const settings = await getCoinSettings();
-  if (!Number.isFinite(coins) || coins < settings.minWithdrawalCoins) {
-    throw new CoinError(`The minimum withdrawal is ${settings.minWithdrawalCoins.toLocaleString("en-NG")} coins`, "INVALID");
+  const { coins, amountKobo } = await checkWithdrawal(input.userId, input.coins);
+  if (input.expectedAmountKobo !== undefined && input.expectedAmountKobo !== amountKobo) {
+    throw new CoinError("The payout amount has changed. Review the new amount and confirm again.", "CHANGED");
   }
-  const profile = await db.profile.findUnique({ where: { userId: input.userId }, select: { role: true } });
-  if (profile?.role !== "ESCORT") throw new CoinError("Withdrawals are for escort accounts", "NOT_ALLOWED");
-
-  const open = await db.coinWithdrawal.count({
-    where: { userId: input.userId, status: { in: ["REQUESTED", "APPROVED"] } },
-  });
-  if (open > 0) throw new CoinError("You already have a withdrawal being processed", "STATE");
-
-  const amountKobo = coins * settings.payoutKoboPerCoin;
   const withdrawalId = randomUUID();
   const result = await move(
     [

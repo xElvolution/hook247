@@ -1,0 +1,207 @@
+/* Withdrawal confirm modal, matching the age gate look */
+.withdraw-confirm-root {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.withdraw-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 9, 11, 0.72);
+  -webkit-backdrop-filter: blur(12px) saturate(0.8);
+  backdrop-filter: blur(12px) saturate(0.8);
+  animation: withdraw-confirm-fade 0.18s ease-out both;
+}
+
+.withdraw-confirm-dialog {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 26rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin: auto;
+  border: 1px solid rgba(223, 58, 106, 0.35);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(223, 58, 106, 0.1), rgba(27, 25, 28, 0.97) 45%), #1a181b;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  padding: 1.8rem 1.5rem 1.4rem;
+  text-align: center;
+  color: var(--color-ink);
+  animation: withdraw-confirm-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.withdraw-confirm-icon {
+  display: inline-flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-brand);
+  border-radius: 999px;
+  background: rgba(223, 58, 106, 0.12);
+  color: var(--color-brand-2);
+}
+
+.withdraw-confirm-kicker {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.withdraw-confirm-dialog h2 {
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.withdraw-confirm-sub {
+  margin-top: -0.35rem;
+  color: var(--color-muted);
+  font-size: 0.88rem;
+}
+
+.withdraw-confirm-account {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: #141315;
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  color: #fbbf24;
+}
+
+.withdraw-confirm-account strong {
+  display: block;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.withdraw-confirm-account small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+}
+
+.withdraw-confirm-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.withdraw-confirm-note svg {
+  margin-top: 0.1rem;
+  color: var(--color-good);
+}
+
+.withdraw-confirm-flash {
+  width: 100%;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.withdraw-confirm-flash[data-tone="bad"] {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
+}
+
+.withdraw-confirm-flash[data-tone="info"] {
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fde68a;
+}
+
+.withdraw-confirm-actions {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.3rem;
+}
+
+.withdraw-confirm-actions button {
+  width: 100%;
+}
+
+.withdraw-confirm-actions button:focus-visible {
+  outline: 2px solid var(--color-brand-2);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .withdraw-confirm-root { padding: 1rem; }
+  .withdraw-confirm-dialog { padding: 1.5rem 1.2rem 1.2rem; border-radius: 1rem; }
+  .withdraw-confirm-dialog h2 { font-size: 1.35rem; }
+}
+
+@keyframes withdraw-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes withdraw-confirm-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .withdraw-confirm-backdrop,
+  .withdraw-confirm-dialog { animation: none; }
+}
+
+/* Balance card: balance on the left, a supporting stat or action on the right */
+.coin-balance-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.coin-balance-card .coin-balance-side strong {
+  justify-content: flex-end;
+  font-size: 1.15rem;
+}
+
+.coin-balance-topup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.45rem 0.9rem;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.coin-balance-topup:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.coin-withdraw-hint[data-tone="bad"] {
+  color: #fca5a5;
+}

@@ -4,14 +4,22 @@ import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
 import { isMockUserId } from "@/lib/mock";
 import { listBanks, resolveAccount } from "@/lib/paystack";
-import { CoinError, requestWithdrawal } from "@/lib/coins";
+import { CoinError, quoteWithdrawal, requestWithdrawal } from "@/lib/coins";
 import { failFrom } from "@/lib/http";
 
 const schema = z.object({
   coins: z.number().int().positive(),
   bankCode: z.string().min(2).max(20),
   accountNumber: z.string().regex(/^\d{10}$/, "Account numbers are 10 digits"),
+  /** The naira amount (in kobo) from the quote the escort confirmed. */
+  expectedAmountKobo: z.number().int().nonnegative(),
 });
+
+function coinErrorStatus(code: CoinError["code"]) {
+  if (code === "INSUFFICIENT") return 402;
+  if (code === "CHANGED") return 409;
+  return 400;
+}
 
 /**
  * Escort asks to cash out coins. The account name is resolved again here
@@ -27,7 +35,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the withdrawal details" }, { status: 400 });
   }
-  const { coins, bankCode, accountNumber } = parsed.data;
+  const { coins, bankCode, accountNumber, expectedAmountKobo } = parsed.data;
 
   try {
     const profile = await db.profile.findUnique({ where: { userId }, select: { role: true } });
@@ -46,16 +54,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "We could not confirm that bank account. Check the details." }, { status: 422 });
     }
 
-    const result = await requestWithdrawal({ userId, coins, bankCode, bankName, accountNumber, accountName });
+    const result = await requestWithdrawal({ userId, coins, bankCode, bankName, accountNumber, accountName, expectedAmountKobo });
     await db.payoutAccount.upsert({
       where: { userId },
       create: { userId, bankCode, bankName, accountNumber, accountName },
       update: { bankCode, bankName, accountNumber, accountName, recipientCode: "" },
     });
-    return NextResponse.json({ ok: true, balance: result.balance, withdrawalId: result.withdrawal.id });
+    return NextResponse.json({
+      ok: true,
+      balance: result.balance,
+      withdrawalId: result.withdrawal.id,
+      coins: result.withdrawal.coins,
+      amountKobo: result.withdrawal.amountKobo,
+      accountName,
+    });
   } catch (err) {
     if (err instanceof CoinError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.code === "INSUFFICIENT" ? 402 : 400 });
+      if (err.code === "CHANGED") {
+        const quote = await quoteWithdrawal(userId, coins).catch(() => null);
+        return NextResponse.json({ error: err.message, code: err.code, quote }, { status: 409 });
+      }
+      return NextResponse.json({ error: err.message, code: err.code }, { status: coinErrorStatus(err.code) });
     }
     return failFrom(err);
   }

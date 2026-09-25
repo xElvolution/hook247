@@ -23,13 +23,11 @@ export default function GoLiveStudio({
   hostId,
   displayName,
   avatarUrl,
-  payoutKoboPerCoin,
   resume,
 }: {
   hostId: string;
   displayName: string;
   avatarUrl: string;
-  payoutKoboPerCoin: number;
   resume: { id: string; title: string; startedAt: string } | null;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -291,9 +289,6 @@ export default function GoLiveStudio({
     return null;
   }
 
-  const naira = (c: number) =>
-    new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 2 }).format((c * payoutKoboPerCoin) / 100);
-
   if (stage === "summary") {
     return (
       <main className="stream-room">
@@ -309,7 +304,7 @@ export default function GoLiveStudio({
               <div className="live-summary-coins">
                 <Coins className="h-6 w-6" />
                 <strong>{summary.coinsEarned.toLocaleString("en-NG")}</strong>
-                <span>coins earned · about {naira(summary.coinsEarned)} at the current payout rate</span>
+                <span>coins earned · withdraw them any time from the Coins page</span>
               </div>
               <dl className="live-summary-grid">
                 <div><dt>Duration</dt><dd>{formatElapsed(summary.durationSeconds)}</dd></div>

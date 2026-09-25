@@ -10,9 +10,13 @@ import {
   Coins,
   Landmark,
   Loader2,
+  Plus,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { coinCount, naira } from "./format";
+import WithdrawConfirmModal, { type WithdrawQuote } from "./WithdrawConfirmModal";
+import "./withdraw-confirm.css";
 
 type Pack = { id: string; name: string; coins: number; priceKobo: number };
 type Tx = {
@@ -40,7 +44,7 @@ type CoinData = {
   wallet: { balance: number; held: number; lifetimeEarned: number };
   isEscort: boolean;
   packs: Pack[];
-  settings: { payoutKoboPerCoin: number; minWithdrawalCoins: number } | null;
+  settings: { minWithdrawalCoins: number } | null;
   transactions: Tx[];
   withdrawals: Withdrawal[];
   payoutAccount: { bankCode: string; bankName: string; accountNumber: string; accountName: string } | null;
@@ -181,13 +185,15 @@ export default function CoinsView({ returnReference }: { returnReference: string
           <strong><Coins className="h-6 w-6" /> {coinCount(data.wallet.balance)}</strong>
           {data.wallet.held > 0 ? <small>{coinCount(data.wallet.held)} coins held for a withdrawal</small> : null}
         </div>
-        {data.isEscort && data.settings ? (
-          <div className="text-right">
-            <p>Worth</p>
-            <strong className="!text-lg">{naira(data.wallet.balance * data.settings.payoutKoboPerCoin)}</strong>
-            <small>{naira(data.settings.payoutKoboPerCoin)} per coin</small>
+        {data.isEscort ? (
+          <div className="coin-balance-side">
+            <p>Earned in tips</p>
+            <strong><TrendingUp className="h-4 w-4" /> {coinCount(data.wallet.lifetimeEarned)}</strong>
+            <small>coins all time</small>
           </div>
-        ) : null}
+        ) : (
+          <a href="#buy-coins" className="coin-balance-topup"><Plus className="h-3.5 w-3.5" /> Top up</a>
+        )}
       </section>
 
       {verifying ? (
@@ -196,7 +202,7 @@ export default function CoinsView({ returnReference }: { returnReference: string
       {notice ? <p className="coin-flash mt-4" data-tone="good"><CheckCircle2 className="h-4 w-4" /> {notice}</p> : null}
       {error ? <p className="coin-flash mt-4" data-tone="bad">{error}</p> : null}
 
-      <h2 className="font-display mt-7 text-lg font-bold">Buy coins</h2>
+      <h2 id="buy-coins" className="font-display mt-7 scroll-mt-24 text-lg font-bold">Buy coins</h2>
       <p className="mt-1 text-sm text-muted">Send tips to escorts from their profile, posts and live rooms. Paid securely with Paystack.</p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         {data.packs.map((pack) => {
@@ -264,6 +270,10 @@ function WithdrawSection({ data, onDone }: { data: CoinData; onDone: () => Promi
   const [resolveError, setResolveError] = useState("");
   const [amount, setAmount] = useState(String(Math.max(settings.minWithdrawalCoins, 0)));
   const [busy, setBusy] = useState(false);
+  const [quoting, setQuoting] = useState(false);
+  const [quote, setQuote] = useState<WithdrawQuote | null>(null);
+  const [modalError, setModalError] = useState("");
+  const [modalNotice, setModalNotice] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
 
@@ -304,25 +314,66 @@ function WithdrawSection({ data, onDone }: { data: CoinData; onDone: () => Promi
   const open = data.withdrawals.find((w) => w.status === "REQUESTED" || w.status === "APPROVED");
   const tooLow = coins < settings.minWithdrawalCoins;
   const tooHigh = coins > data.wallet.balance;
-  const canSubmit = !open && !busy && !tooLow && !tooHigh && !!accountName && !!bankCode && /^\d{10}$/.test(accountNumber);
+  const accountReady = !!accountName && !!bankCode && /^\d{10}$/.test(accountNumber);
+  const canSubmit = !open && !busy && !quoting && !tooLow && !tooHigh && accountReady;
+  const bankName = banks.find((b) => b.code === bankCode)?.name ?? (data.payoutAccount?.bankCode === bankCode ? data.payoutAccount.bankName : "");
 
-  async function submit(event: React.FormEvent) {
+  const amountHint = !amount
+    ? `Minimum ${coinCount(settings.minWithdrawalCoins)} coins`
+    : tooHigh
+      ? `That is more than your balance of ${coinCount(data.wallet.balance)} coins`
+      : tooLow
+        ? `The minimum withdrawal is ${coinCount(settings.minWithdrawalCoins)} coins`
+        : `${coinCount(data.wallet.balance - coins)} coins will stay in your wallet`;
+
+  // Ask the server what this withdrawal pays, then show the confirm step.
+  async function review(event: React.FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
-    setBusy(true);
+    setQuoting(true);
     setError("");
+    setDone("");
+    const response = await fetch("/api/coins/withdraw/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coins }),
+    }).catch(() => null);
+    const body = response ? await response.json().catch(() => ({})) : {};
+    setQuoting(false);
+    if (!response?.ok || typeof body.amountKobo !== "number") {
+      setError(body.error ?? "We could not work out your payout. Try again.");
+      return;
+    }
+    setModalError("");
+    setModalNotice("");
+    setQuote({ coins: body.coins, amountKobo: body.amountKobo });
+  }
+
+  async function confirm() {
+    if (!quote || busy) return;
+    setBusy(true);
+    setModalError("");
+    setModalNotice("");
     const response = await fetch("/api/coins/withdraw", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coins, bankCode, accountNumber }),
+      body: JSON.stringify({ coins: quote.coins, bankCode, accountNumber, expectedAmountKobo: quote.amountKobo }),
     }).catch(() => null);
     const body = response ? await response.json().catch(() => ({})) : {};
     setBusy(false);
-    if (!response?.ok) {
-      setError(body.error ?? "The withdrawal could not be requested.");
+    if (response?.status === 409 && body.quote && typeof body.quote.amountKobo === "number") {
+      setQuote({ coins: body.quote.coins, amountKobo: body.quote.amountKobo });
+      setModalNotice("The payout amount was just updated. Check the new figure and confirm again.");
       return;
     }
-    setDone(`Withdrawal of ${coinCount(coins)} coins requested. We will pay ${naira(coins * settings.payoutKoboPerCoin)} to ${accountName}.`);
+    if (!response?.ok) {
+      setModalError(body.error ?? "The withdrawal could not be requested. Try again.");
+      return;
+    }
+    setQuote(null);
+    setDone(
+      `Withdrawal of ${coinCount(body.coins ?? quote.coins)} coins requested. We will send ${naira(body.amountKobo ?? quote.amountKobo)} to ${body.accountName || accountName} once it is approved.`
+    );
     await onDone();
   }
 
@@ -330,8 +381,8 @@ function WithdrawSection({ data, onDone }: { data: CoinData; onDone: () => Promi
     <section className="coin-withdraw mt-8">
       <h2 className="font-display flex items-center gap-2 text-lg font-bold"><Banknote className="h-5 w-5 text-[#df3a6a]" /> Withdraw earnings</h2>
       <p className="mt-1 text-sm text-muted">
-        Each coin pays {naira(settings.payoutKoboPerCoin)}. Minimum withdrawal is {coinCount(settings.minWithdrawalCoins)} coins
-        ({naira(settings.minWithdrawalCoins * settings.payoutKoboPerCoin)}). You have earned {coinCount(data.wallet.lifetimeEarned)} coins in tips so far.
+        Cash out the coins you earn from tips and live gifts. The minimum withdrawal is {coinCount(settings.minWithdrawalCoins)} coins.
+        You will see exactly what you receive before you confirm.
       </p>
 
       {open ? (
@@ -339,7 +390,7 @@ function WithdrawSection({ data, onDone }: { data: CoinData; onDone: () => Promi
           <Loader2 className="h-4 w-4 animate-spin" /> {coinCount(open.coins)} coins ({naira(open.amountKobo)}) to {open.accountName} is being processed.
         </p>
       ) : (
-        <form onSubmit={submit} className="mt-4 space-y-3">
+        <form onSubmit={review} className="mt-4 space-y-3">
           <label className="coin-field">
             <span>Bank</span>
             <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} disabled={!banks.length}>
@@ -357,18 +408,30 @@ function WithdrawSection({ data, onDone }: { data: CoinData; onDone: () => Promi
           </p>
           <label className="coin-field">
             <span>Coins to withdraw</span>
-            <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
+            <input inputMode="numeric" value={amount} aria-invalid={!!amount && (tooHigh || tooLow)} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
           </label>
-          <p className="text-xs text-muted">
-            You receive <strong className="text-white">{naira(coins * settings.payoutKoboPerCoin)}</strong>
-            {tooHigh ? " · more than your balance" : tooLow ? ` · minimum ${coinCount(settings.minWithdrawalCoins)} coins` : ""}
+          <p className="coin-withdraw-hint text-xs text-muted" data-tone={amount && (tooHigh || tooLow) ? "bad" : undefined} aria-live="polite">
+            {amountHint}
           </p>
           {error ? <p className="coin-flash" data-tone="bad">{error}</p> : null}
           <button type="submit" className="btn-primary w-full text-sm" disabled={!canSubmit}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Request withdrawal"}
+            {quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Withdraw"}
           </button>
         </form>
       )}
+      {quote ? (
+        <WithdrawConfirmModal
+          quote={quote}
+          bankName={bankName}
+          accountNumber={accountNumber}
+          accountName={accountName}
+          busy={busy}
+          error={modalError}
+          notice={modalNotice}
+          onConfirm={() => void confirm()}
+          onCancel={() => setQuote(null)}
+        />
+      ) : null}
       {done ? <p className="coin-flash mt-3" data-tone="good"><CheckCircle2 className="h-4 w-4" /> {done}</p> : null}
 
       {data.withdrawals.length ? (

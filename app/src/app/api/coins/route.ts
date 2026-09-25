@@ -37,9 +37,9 @@ export async function GET() {
       wallet,
       isEscort,
       packs: packs.map((p) => ({ id: p.id, name: p.name, coins: p.coins, priceKobo: p.priceKobo })),
-      settings: isEscort
-        ? { payoutKoboPerCoin: settings.payoutKoboPerCoin, minWithdrawalCoins: settings.minWithdrawalCoins }
-        : null,
+      // The payout rate is deliberately left out: escorts only see what they will
+      // receive in the quote shown when they confirm a withdrawal.
+      settings: isEscort ? { minWithdrawalCoins: settings.minWithdrawalCoins } : null,
       transactions: transactions.map((t) => ({
         id: t.id,
         type: t.type,
