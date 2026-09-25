@@ -135,6 +135,8 @@ model User {
   coinTransactions   CoinTransaction[]
   coinPurchases      CoinPurchase[]
   coinWithdrawals    CoinWithdrawal[]
+  liveSessions       LiveSession[]
+  liveComments       LiveComment[]
   payoutAccount      PayoutAccount?
 
   @@index([bannedAt])
@@ -628,4 +630,57 @@ model PayoutAccount {
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------- live video
+
+enum LiveStatus {
+  LIVE
+  ENDED
+}
+
+/// One broadcast by an escort. Media runs through the self-hosted LiveKit server.
+model LiveSession {
+  id          String     @id @default(cuid())
+  hostId      String
+  title       String
+  roomName    String     @unique
+  status      LiveStatus @default(LIVE)
+  startedAt   DateTime   @default(now())
+  endedAt     DateTime?
+  /// Last time the host was seen connected to the room.
+  hostSeenAt  DateTime   @default(now())
+  peakViewers Int        @default(0)
+  endReason   String     @default("")
+
+  host     User          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  comments LiveComment[]
+
+  @@index([status, startedAt])
+  @@index([hostId, startedAt])
+}
+
+model LiveComment {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+/// Gifts viewers can send during a live. Priced in coins; editable in the console.
+model LiveGift {
+  id        String   @id @default(cuid())
+  name      String
+  emoji     String
+  coins     Int
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

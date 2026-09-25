@@ -1,104 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Eye, Heart, MapPin, MessageCircle, Radio, Share2, UserRound, X } from "lucide-react";
-import type { LiveHost } from "@/components/LiveStreamViewer";
+import { BadgeCheck, Eye, MapPin, Radio, RefreshCw, X } from "lucide-react";
+import type { LiveListing } from "@/lib/live";
 
-function LiveFeedRoom({ authed, host, index }: { authed: boolean; host: LiveHost; index: number }) {
-  const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [liked, setLiked] = useState(false);
-  const viewers = 420 + host.displayName.charCodeAt(0) * 5 + index * 83;
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) video.play().catch(() => undefined);
-        else video.pause();
-      },
-      { threshold: 0.65 }
-    );
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, []);
-
-  function requireAccount() {
-    router.push(`/signup?next=${encodeURIComponent("/live")}`);
-  }
-
-  async function share() {
-    const url = `${window.location.origin}/live/${encodeURIComponent(host.userId)}`;
-    if (navigator.share) await navigator.share({ title: `${host.displayName} is live`, url }).catch(() => undefined);
-    else await navigator.clipboard.writeText(url).catch(() => undefined);
-  }
-
-  return (
-    <section className="live-feed-room" aria-label={`${host.displayName}'s live room`}>
-      <div className="live-feed-backdrop" aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={host.avatarUrl} alt="" />
-      </div>
-      <div className="live-feed-layout">
-        <aside className="live-feed-host-panel">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={host.avatarUrl} alt={host.displayName} />
-          <h2>{host.displayName}, {host.age} {host.verified && <BadgeCheck className="h-4 w-4 fill-[#df3a6a] text-white" />}</h2>
-          <p><MapPin className="h-3.5 w-3.5" /> {[host.city, host.state].filter(Boolean).join(", ")}</p>
-          <div>{host.interests.slice(0, 3).map((interest) => <span key={interest}>#{interest}</span>)}</div>
-          <Link href={`/profiles/${encodeURIComponent(host.userId)}`}><UserRound className="h-4 w-4" /> View profile</Link>
-        </aside>
-
-        <div className="live-feed-stage">
-          <video ref={videoRef} muted loop playsInline poster={host.avatarUrl} preload={index < 2 ? "auto" : "metadata"}>
-            <source src="/demo-live.mp4" type="video/mp4" />
-          </video>
-          <div className="live-feed-stage-header">
-            <span><Radio className="h-3 w-3" /> LIVE</span>
-            <small><Eye className="h-3.5 w-3.5" /> {new Intl.NumberFormat("en").format(viewers)}</small>
-          </div>
-          <div className="live-feed-mobile-host">
-            <strong>{host.displayName}, {host.age}</strong>
-            <Link href={`/profiles/${encodeURIComponent(host.userId)}`}>View profile</Link>
-          </div>
-          <div className="live-feed-actions">
-            <button type="button" onClick={() => authed ? setLiked((current) => !current) : requireAccount()} aria-label={`Like ${host.displayName}'s live`}>
-              <Heart className={`h-5 w-5 ${liked ? "fill-[#df3a6a] text-[#df3a6a]" : ""}`} /><span>{liked ? "Liked" : "Like"}</span>
-            </button>
-            <button type="button" onClick={() => authed ? undefined : requireAccount()} aria-label="Join live chat"><MessageCircle className="h-5 w-5" /><span>Chat</span></button>
-            <button type="button" onClick={share} aria-label="Share live room"><Share2 className="h-5 w-5" /><span>Share</span></button>
-          </div>
-        </div>
-
-        <aside className="live-feed-chat-preview">
-          <h3><MessageCircle className="h-4 w-4" /> Live chat</h3>
-          <div>
-            <p><strong>Tomi</strong> The energy is perfect tonight.</p>
-            <p><strong>Amaka</strong> Watching from Abuja.</p>
-            <p><strong>Jay</strong> This is a vibe.</p>
-            <p><strong>Mo</strong> Love the setup.</p>
-          </div>
-          <button type="button" onClick={() => authed ? router.push(`/live/${host.userId}`) : requireAccount()}>{authed ? "Open chat" : "Sign in to chat"}</button>
-        </aside>
-      </div>
-    </section>
-  );
+function since(iso: string, now: number) {
+  const mins = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return "Just started";
+  if (mins < 60) return `${mins} min`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-export default function LiveDirectory({ authed, hosts }: { authed: boolean; hosts: LiveHost[] }) {
+export default function LiveDirectory({
+  authed,
+  canGoLive,
+  lives,
+}: {
+  authed: boolean;
+  canGoLive: boolean;
+  lives: LiveListing[];
+}) {
+  const router = useRouter();
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const clock = window.setInterval(() => setNow(Date.now()), 30_000);
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 20_000);
+    return () => {
+      window.clearInterval(clock);
+      window.clearInterval(refresh);
+    };
+  }, [router]);
+
   return (
-    <main className="live-feed">
-      <header className="live-feed-topbar">
-        <Link href="/" aria-label="Close live feed"><X className="h-5 w-5" /></Link>
-        <strong>Hooks247 Live</strong>
-        <span>{hosts.length} rooms</span>
+    <main className="live-lobby">
+      <header className="live-lobby-top">
+        <Link href="/feed" aria-label="Close live" className="stream-icon-button"><X className="h-5 w-5" /></Link>
+        <div>
+          <strong>Hooks247 Live</strong>
+          <small>{lives.length ? `${lives.length} live now` : "No one live yet"}</small>
+        </div>
+        {canGoLive ? (
+          <Link href="/live/go" className="live-go-button"><Radio className="h-4 w-4" /> Go live</Link>
+        ) : (
+          <button type="button" className="stream-icon-button" onClick={() => router.refresh()} aria-label="Refresh"><RefreshCw className="h-4 w-4" /></button>
+        )}
       </header>
-      <div className="live-feed-scroller">
-        {hosts.map((host, index) => <LiveFeedRoom key={host.userId} authed={authed} host={host} index={index} />)}
-      </div>
+
+      {!authed ? (
+        <p className="live-lobby-hint">
+          <Link href="/login?next=/live">Sign in</Link> to watch lives, chat and send gifts.
+        </p>
+      ) : null}
+
+      {lives.length === 0 ? (
+        <section className="live-lobby-empty">
+          <Radio className="h-8 w-8" />
+          <h1>Nobody is live right now</h1>
+          <p>{canGoLive ? "Be the first. Go live and earn coins from gifts." : "Lives show up here the moment an escort starts streaming."}</p>
+          {canGoLive ? <Link href="/live/go" className="btn-primary text-sm">Start a live</Link> : <Link href="/feed" className="btn-primary text-sm">Back to feed</Link>}
+        </section>
+      ) : (
+        <section className="live-lobby-grid">
+          {lives.map((live) => (
+            <Link key={live.sessionId} href={`/live/${encodeURIComponent(live.host.userId)}`} className="live-card" aria-label={`Watch ${live.host.displayName} live`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {live.host.avatarUrl ? <img src={live.host.avatarUrl} alt="" /> : <span className="live-card-initial">{live.host.displayName.slice(0, 1)}</span>}
+              <span className="live-card-shade" />
+              <span className="live-card-top">
+                <i><Radio className="h-3 w-3" /> LIVE</i>
+                <em><Eye className="h-3 w-3" /> {live.viewers.toLocaleString("en-NG")}</em>
+              </span>
+              <span className="live-card-body">
+                <b>{live.title}</b>
+                <span>
+                  {live.host.displayName}, {live.host.age}
+                  {live.host.verified ? <BadgeCheck className="h-3.5 w-3.5 fill-[#df3a6a] text-white" /> : null}
+                </span>
+                <small><MapPin className="h-3 w-3" /> {live.host.city || live.host.state}{now !== null ? ` · ${since(live.startedAt, now)}` : ""}</small>
+              </span>
+            </Link>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

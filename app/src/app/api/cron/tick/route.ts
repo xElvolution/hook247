@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { settleCommissions } from "@/lib/money";
+import { reconcileLives } from "@/lib/live";
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET || process.env.AUTH_SECRET || "";
@@ -8,5 +9,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   await settleCommissions(true);
-  return NextResponse.json({ ok: true, settled: true, at: new Date().toISOString() });
+  const lives = await reconcileLives(true).catch((err) => {
+    console.error("live reconcile", err);
+    return { ended: 0 };
+  });
+  return NextResponse.json({ ok: true, settled: true, livesEnded: lives.ended, at: new Date().toISOString() });
 }
