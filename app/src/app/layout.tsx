@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Sora } from "next/font/google";
 import "./globals.css";
 import "./features.css";
+import AgeGate from "@/components/AgeGate";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
@@ -25,7 +26,10 @@ export default function RootLayout({
       className={`${geist.variable} ${sora.variable}`}
       data-scroll-behavior="smooth"
     >
-      <body className="noise antialiased">{children}</body>
+      <body className="noise antialiased">
+        {children}
+        <AgeGate />
+      </body>
     </html>
   );
 }
