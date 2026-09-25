@@ -23,6 +23,8 @@ import {
   Video,
   X,
 } from "lucide-react";
+import PollCard, { type PollData } from "@/components/feed/PollCard";
+import PollBuilder, { emptyPollDraft, pollDraftProblem, type PollDraft } from "@/components/feed/PollBuilder";
 
 type FeedCategory = "trending" | "explore" | "erotica" | "poll";
 type FeedPost = {
@@ -34,7 +36,7 @@ type FeedPost = {
   category: FeedCategory;
   boards?: FeedCategory[];
   views: number;
-  poll: null | { question: string; options: { label: string; votes: number }[] };
+  poll: PollData | null;
   createdAt: string;
   mine: boolean;
   author: {
@@ -82,7 +84,6 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
   const [comments, setComments] = useState(post.comments);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [pollChoice, setPollChoice] = useState<number | null>(null);
 
   function requireAccount() {
     router.push(`/signup?next=${encodeURIComponent("/feed")}`);
@@ -128,15 +129,9 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
     else await navigator.clipboard.writeText(url).catch(() => undefined);
   }
 
-  function vote(index: number) {
-    if (guest) return requireAccount();
-    setPollChoice(index);
-  }
-
   const boards = post.boards?.length ? post.boards : [post.category || "explore"];
   const badgeId = boards.find((id) => id !== "explore") ?? "explore";
   const category = TABS.find((tab) => tab.id === badgeId) ?? TABS[1];
-  const totalVotes = post.poll?.options.reduce((sum, option) => sum + option.votes, 0) ?? 0;
 
   return (
     <motion.article
@@ -164,7 +159,7 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
         ) : null}
       </header>
 
-      <p className="pulse-post-copy">{post.body}</p>
+      {post.body ? <p className="pulse-post-copy">{post.body}</p> : null}
 
       {post.videoUrl && (
         <div className="pulse-media pulse-video">
@@ -183,30 +178,7 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
       )}
 
       {post.poll && (
-        <div className="pulse-poll">
-          <h3>{post.poll.question}</h3>
-          <div className="mt-3 space-y-2">
-            {post.poll.options.map((option, index) => {
-              const votes = option.votes + (pollChoice === index ? 1 : 0);
-              const denominator = totalVotes + (pollChoice === null ? 0 : 1);
-              const percentage = denominator ? Math.round((votes / denominator) * 100) : 0;
-              return (
-                <button
-                  type="button"
-                  key={option.label}
-                  className="pulse-poll-option"
-                  data-selected={pollChoice === index}
-                  onClick={() => vote(index)}
-                >
-                  <span>{option.label}</span>
-                  <strong>{pollChoice === null ? "Vote" : `${percentage}%`}</strong>
-                  {pollChoice !== null && <i style={{ width: `${percentage}%` }} />}
-                </button>
-              );
-            })}
-          </div>
-          <p>{totalVotes + (pollChoice === null ? 0 : 1)} votes</p>
-        </div>
+        <PollCard postId={post.id} initial={post.poll} guest={guest} mine={post.mine} onRequireAccount={requireAccount} />
       )}
 
       <div className="pulse-actions">
@@ -260,6 +232,8 @@ export default function FeedPage() {
   const [mediaKind, setMediaKind] = useState<"image" | "video" | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploadError, setUploadError] = useState("");
+  const [pollMode, setPollMode] = useState(false);
+  const [pollDraft, setPollDraft] = useState<PollDraft>(emptyPollDraft);
 
   async function load() {
     const response = await fetch("/api/feed");
@@ -321,12 +295,19 @@ export default function FeedPage() {
       return;
     }
     const body = draft.trim();
-    if ((!body && !mediaFile) || posting) return;
+    if (posting) return;
+    if (pollMode) {
+      const problem = pollDraftProblem(pollDraft);
+      if (problem) {
+        setUploadError(problem);
+        return;
+      }
+    } else if (!body && !mediaFile) return;
     setPosting(true);
     setUploadError("");
     let imageUrl = "";
     let videoUrl = "";
-    if (mediaFile) {
+    if (mediaFile && !pollMode) {
       const upload = new FormData();
       upload.set("file", mediaFile);
       const uploadResponse = await fetch("/api/uploads", { method: "POST", body: upload });
@@ -342,16 +323,37 @@ export default function FeedPage() {
     const response = await fetch("/api/feed", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body, imageUrl, videoUrl }),
+      body: JSON.stringify({
+        body,
+        imageUrl,
+        videoUrl,
+        ...(pollMode
+          ? {
+              poll: {
+                question: pollDraft.question.trim(),
+                options: pollDraft.options.map((o) => o.trim()).filter(Boolean),
+                allowMultiple: pollDraft.allowMultiple,
+              },
+            }
+          : {}),
+      }),
     });
-    setPosting(false);
     if (response.ok) {
       setDraft("");
       setMediaFile(null);
       setMediaKind(null);
       setPreviewUrl("");
+      if (pollMode) {
+        setPollMode(false);
+        setPollDraft(emptyPollDraft());
+        setActiveTab("poll");
+      }
       await load();
+    } else {
+      const data = await response.json().catch(() => ({}));
+      setUploadError(data.error ?? "Your post could not be published. Try again.");
     }
+    setPosting(false);
   }
 
   function chooseMedia(file: File | undefined) {
@@ -365,6 +367,17 @@ export default function FeedPage() {
     setMediaKind(file.type.startsWith("video/") ? "video" : "image");
     setPreviewUrl(URL.createObjectURL(file));
     setUploadError("");
+  }
+
+  function togglePoll() {
+    if (guest) {
+      router.push(`/signup?next=${encodeURIComponent("/feed")}`);
+      return;
+    }
+    const next = !pollMode;
+    setPollMode(next);
+    setUploadError("");
+    if (next) removeMedia();
   }
 
   function removeMedia() {
@@ -405,11 +418,12 @@ export default function FeedPage() {
           {activeTab === "explore" && "Explore is every post."}
           {activeTab === "trending" && "Trending is posts people are checking and liking."}
           {activeTab === "erotica" && "Erotica is videos or posts with spicy wording."}
-          {activeTab === "poll" && "Polls are posts that ask a question."}
+          {activeTab === "poll" && "Polls let the community vote on a question."}
         </p>
 
         <form id="feed-composer" onSubmit={publish} className="pulse-composer mt-4">
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hooks247 to share an update" : "Share what is happening"} />
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hooks247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
+          {pollMode && <PollBuilder value={pollDraft} onChange={setPollDraft} />}
           {previewUrl && (
             <div className="pulse-upload-preview">
               {mediaKind === "video" ? <video src={previewUrl} controls playsInline /> : (
@@ -422,17 +436,20 @@ export default function FeedPage() {
           {uploadError && <p className="pulse-upload-error">{uploadError}</p>}
           <div className="pulse-composer-footer">
             <div className="pulse-upload-actions">
-              <label>
+              {!pollMode && <label>
                 <ImagePlus className="h-4 w-4" /> Photo
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => chooseMedia(event.target.files?.[0])} />
-              </label>
-              <label>
+              </label>}
+              {!pollMode && <label>
                 <Video className="h-4 w-4" /> Video
                 <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => chooseMedia(event.target.files?.[0])} />
-              </label>
+              </label>}
+              <button type="button" onClick={togglePoll} data-active={pollMode} aria-pressed={pollMode}>
+                <BarChart3 className="h-4 w-4" /> Poll
+              </button>
             </div>
             <span>{draft.length}/1000</span>
-            <button type="submit" className="btn-primary !px-5 !py-2 text-xs" disabled={(!draft.trim() && !mediaFile) || posting}>{posting ? "Publishing..." : "Post update"}</button>
+            <button type="submit" className="btn-primary !px-5 !py-2 text-xs" disabled={(pollMode ? !!pollDraftProblem(pollDraft) : !draft.trim() && !mediaFile) || posting}>{posting ? "Publishing..." : pollMode ? "Post poll" : "Post update"}</button>
           </div>
         </form>
 
@@ -451,7 +468,7 @@ export default function FeedPage() {
             <p className="mt-2 text-sm text-muted">
               {activeTab === "trending" && "A post lands here after people like and comment on it."}
               {activeTab === "erotica" && "Add a video or spicy text and it shows here automatically."}
-              {activeTab === "poll" && "Ask a question in your post and it shows here."}
+              {activeTab === "poll" && "Tap Poll in the composer to ask the community something."}
               {activeTab === "explore" && "Be the first to post."}
             </p>
             <button type="button" className="section-link mt-3" onClick={() => setActiveTab("explore")}>Open Explore</button>

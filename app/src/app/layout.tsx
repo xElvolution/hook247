@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Sora } from "next/font/google";
 import "./globals.css";
+import "./features.css";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });

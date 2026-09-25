@@ -6,6 +6,7 @@ import { ageFrom, getActiveSessionUserId } from "@/lib/user";
 import { VISIBLE_POST, VISIBLE_COMMENT, VISIBLE_PROFILE } from "@/lib/moderation";
 import { isMockUserId, mockFeed } from "@/lib/mock";
 import { feedBoards, primaryBoard } from "@/lib/feedBoards";
+import { POLL_MAX_OPTIONS, POLL_MIN_OPTIONS, pollInclude, serializePoll, voterCounts } from "@/lib/polls";
 
 /** Sidebar suggestions: verified and recently-active members come first. */
 async function recommendations(excludeUserId: string | null) {
@@ -49,10 +50,14 @@ export async function GET() {
           include: { author: { include: { profile: true } } },
         },
         _count: { select: { likes: true, comments: { where: VISIBLE_COMMENT } } },
+        poll: { include: pollInclude(userId) },
       },
     }),
     recommendations(userId),
   ]);
+  const voters = await voterCounts(
+    posts.map((p) => p.poll?.id).filter((id): id is string => Boolean(id))
+  );
 
   return NextResponse.json({
     guest: !userId,
@@ -62,7 +67,8 @@ export async function GET() {
       const boards = feedBoards({
         body: p.body,
         videoUrl: p.videoUrl,
-        poll: null,
+        poll: p.poll,
+        storedCategory: p.category,
         likeCount: p._count.likes,
         commentCount: p._count.comments,
         views,
@@ -76,6 +82,7 @@ export async function GET() {
       category: primaryBoard(boards),
       boards,
       views,
+      poll: p.poll ? serializePoll(p.poll, voters.get(p.poll.id) ?? 0) : null,
       createdAt: p.createdAt,
       mine: p.authorId === userId,
       author: {
@@ -99,13 +106,28 @@ export async function GET() {
   });
 }
 
+const pollSchema = z
+  .object({
+    question: z.string().trim().min(1, "Ask a question").max(200),
+    options: z
+      .array(z.string().trim().min(1, "Options cannot be empty").max(100))
+      .min(POLL_MIN_OPTIONS, `Add at least ${POLL_MIN_OPTIONS} options`)
+      .max(POLL_MAX_OPTIONS, `Polls take up to ${POLL_MAX_OPTIONS} options`),
+    allowMultiple: z.boolean().default(false),
+  })
+  .refine(
+    (poll) => new Set(poll.options.map((o) => o.toLowerCase())).size === poll.options.length,
+    { message: "Each option must be different" }
+  );
+
 const postSchema = z
   .object({
     body: z.string().max(1000).default(""),
     imageUrl: z.string().url().or(z.string().startsWith("/uploads/")).or(z.literal("")).default(""),
     videoUrl: z.string().url().or(z.string().startsWith("/uploads/")).or(z.literal("")).default(""),
+    poll: pollSchema.optional(),
   })
-  .refine((data) => !!data.body.trim() || !!data.imageUrl || !!data.videoUrl, {
+  .refine((data) => !!data.body.trim() || !!data.imageUrl || !!data.videoUrl || !!data.poll, {
     message: "Add text, an image, or a video",
   });
 
@@ -118,13 +140,18 @@ export async function POST(req: Request) {
 
   const parsed = postSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 400 }
+    );
   }
 
   const body = parsed.data.body.trim();
+  const poll = parsed.data.poll;
   const boards = feedBoards({
     body,
     videoUrl: parsed.data.videoUrl,
+    poll,
     likeCount: 0,
     commentCount: 0,
   });
@@ -134,7 +161,20 @@ export async function POST(req: Request) {
       body,
       imageUrl: parsed.data.imageUrl,
       videoUrl: parsed.data.videoUrl,
-      category: primaryBoard(boards),
+      category: poll ? "poll" : primaryBoard(boards),
+      ...(poll
+        ? {
+            poll: {
+              create: {
+                question: poll.question,
+                allowMultiple: poll.allowMultiple,
+                options: {
+                  create: poll.options.map((label, position) => ({ label, position })),
+                },
+              },
+            },
+          }
+        : {}),
     },
   });
   return NextResponse.json({ ok: true, id: post.id });

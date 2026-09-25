@@ -127,6 +127,7 @@ model User {
   reportsMade        Report[]            @relation("reporter")
   reportsAgainst     Report[]            @relation("reportedUser")
   reviewsWritten     ListingReview[]     @relation("reviewAuthor")
+  pollVotes          PollVote[]
 
   @@index([bannedAt])
   @@index([createdAt])
@@ -253,6 +254,7 @@ model Post {
   author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes    PostLike[]
   comments Comment[]
+  poll     Poll?
 
   @@index([createdAt])
   @@index([hiddenAt])
@@ -448,4 +450,47 @@ model ListingReview {
 
   @@unique([listingUserId, authorId])
   @@index([listingUserId, createdAt])
+}
+
+/// A WhatsApp-style poll attached to a post. The post body carries any extra
+/// caption; the question and its options live here.
+model Poll {
+  id            String   @id @default(cuid())
+  postId        String   @unique
+  question      String
+  allowMultiple Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  post    Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  options PollOption[]
+  votes   PollVote[]
+}
+
+model PollOption {
+  id       String @id @default(cuid())
+  pollId   String
+  label    String
+  position Int
+
+  poll  Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes PollVote[]
+
+  @@index([pollId, position])
+}
+
+/// One row per chosen option. Single-answer polls hold at most one row per
+/// voter; changing a vote replaces the voter's rows inside a transaction.
+model PollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  optionId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, userId])
+  @@index([pollId, userId])
 }
