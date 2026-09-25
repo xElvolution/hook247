@@ -28,16 +28,38 @@ async function recommendations(excludeUserId: string | null) {
   }));
 }
 
-export async function GET() {
-  // Guests can read the feed; posting/liking/commenting requires login.
+export async function GET(req: Request) {
+  // Guests can read the public feed; posting/liking/commenting requires login.
   const userId = await getSessionUserId();
+  const erotica = new URL(req.url).searchParams.get("board") === "erotica";
   if (isMockUserId(userId)) {
-    return NextResponse.json(mockFeed());
+    return NextResponse.json(erotica ? { ...mockFeed(), posts: [] } : mockFeed());
+  }
+
+  // The Erotica board is only served to signed-in members who have confirmed
+  // they are 18+. The check is here, not just in the UI, so the posts never
+  // reach a browser that has not passed the gate.
+  if (erotica) {
+    if (!userId) {
+      return NextResponse.json({ error: "Sign in to view Erotica", needsLogin: true }, { status: 401 });
+    }
+    const me = await db.user.findUnique({
+      where: { id: userId },
+      select: { adultConfirmedAt: true, bannedAt: true },
+    });
+    if (!me || me.bannedAt) {
+      return NextResponse.json({ error: "Sign in to view Erotica", needsLogin: true }, { status: 401 });
+    }
+    if (!me.adultConfirmedAt) {
+      return NextResponse.json({ error: "Confirm you are 18 or older", needsAdultConfirm: true }, { status: 403 });
+    }
   }
 
   const [posts, recommended] = await Promise.all([
     db.post.findMany({
-      where: VISIBLE_POST,
+      where: {
+        AND: [VISIBLE_POST, erotica ? { category: "erotica" } : { category: { not: "erotica" } }],
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -82,6 +104,7 @@ export async function GET() {
       category: primaryBoard(boards),
       boards,
       views,
+      explicit: p.category === "erotica",
       poll: p.poll ? serializePoll(p.poll, voters.get(p.poll.id) ?? 0) : null,
       createdAt: p.createdAt,
       mine: p.authorId === userId,
@@ -126,6 +149,8 @@ const postSchema = z
     imageUrl: z.string().url().or(z.string().startsWith("/uploads/")).or(z.literal("")).default(""),
     videoUrl: z.string().url().or(z.string().startsWith("/uploads/")).or(z.literal("")).default(""),
     poll: pollSchema.optional(),
+    erotica: z.boolean().default(false),
+    attest: z.boolean().default(false),
   })
   .refine((data) => !!data.body.trim() || !!data.imageUrl || !!data.videoUrl || !!data.poll, {
     message: "Add text, an image, or a video",
@@ -148,6 +173,32 @@ export async function POST(req: Request) {
 
   const body = parsed.data.body.trim();
   const poll = parsed.data.poll;
+  const erotica = parsed.data.erotica;
+
+  if (erotica) {
+    if (poll) {
+      return NextResponse.json({ error: "Polls cannot be posted to Erotica" }, { status: 400 });
+    }
+    const author = await db.user.findUnique({
+      where: { id: userId },
+      select: { profile: { select: { verified: true, birthDate: true } } },
+    });
+    if (!author?.profile?.verified) {
+      return NextResponse.json(
+        { error: "Only verified members can post to Erotica. Verify your profile first.", needsVerification: true },
+        { status: 403 }
+      );
+    }
+    if (ageFrom(author.profile.birthDate) < 18) {
+      return NextResponse.json({ error: "You must be 18 or older to post to Erotica" }, { status: 403 });
+    }
+    if (!parsed.data.attest) {
+      return NextResponse.json(
+        { error: "Confirm that you own this content and everyone in it is 18+ and consented" },
+        { status: 400 }
+      );
+    }
+  }
   const boards = feedBoards({
     body,
     videoUrl: parsed.data.videoUrl,
@@ -161,7 +212,8 @@ export async function POST(req: Request) {
       body,
       imageUrl: parsed.data.imageUrl,
       videoUrl: parsed.data.videoUrl,
-      category: poll ? "poll" : primaryBoard(boards),
+      category: erotica ? "erotica" : poll ? "poll" : primaryBoard(boards),
+      adultAttestedAt: erotica ? new Date() : null,
       ...(poll
         ? {
             poll: {

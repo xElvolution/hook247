@@ -1,10 +1,12 @@
 export type FeedBoard = "trending" | "explore" | "erotica" | "poll";
 
-const EROTIC =
-  /\b(sex|sexy|sexual|nude|nudes|naked|pussy|dick|cock|fuck|fucking|blow ?job|bj\b|anal|boob|boobs|ass\b|tits|cum|horny|xxx|erotic|erotica|hook ?up|onlyfans|squirting|deepthroat)\b/i;
-
-export function isEroticPost(body: string, videoUrl = "") {
-  return Boolean(videoUrl.trim()) || EROTIC.test(body);
+/**
+ * Erotica is an explicit choice the author makes at post time (with an 18+
+ * attestation), never a guess from the wording, because it decides who is
+ * allowed to see the post at all.
+ */
+export function isEroticPost(storedCategory = "") {
+  return storedCategory === "erotica";
 }
 
 /**
@@ -28,9 +30,10 @@ export function feedBoards(input: {
   commentCount: number;
   views?: number;
 }): FeedBoard[] {
+  // Erotica never leaks onto the public boards: it lives behind the 18+ gate only.
+  if (isEroticPost(input.storedCategory)) return ["erotica"];
   const boards: FeedBoard[] = ["explore"];
   if (isPollPost(input.poll, input.storedCategory)) boards.push("poll");
-  if (isEroticPost(input.body, input.videoUrl ?? "")) boards.push("erotica");
   if (isTrendingPost(input.likeCount, input.commentCount, input.views)) boards.push("trending");
   return boards;
 }

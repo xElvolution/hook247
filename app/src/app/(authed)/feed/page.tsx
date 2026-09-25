@@ -24,6 +24,9 @@ import {
   X,
 } from "lucide-react";
 import PollCard, { type PollData } from "@/components/feed/PollCard";
+import ReportButton from "@/components/ReportButton";
+import EroticaGate from "@/components/feed/EroticaGate";
+import BlurredMedia from "@/components/feed/BlurredMedia";
 import PollBuilder, { emptyPollDraft, pollDraftProblem, type PollDraft } from "@/components/feed/PollBuilder";
 
 type FeedCategory = "trending" | "explore" | "erotica" | "poll";
@@ -37,6 +40,7 @@ type FeedPost = {
   boards?: FeedCategory[];
   views: number;
   poll: PollData | null;
+  explicit?: boolean;
   createdAt: string;
   mine: boolean;
   author: {
@@ -77,7 +81,15 @@ function timeAgo(iso: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
+function PostCard({
+  post,
+  guest,
+  onHidden,
+}: {
+  post: FeedPost;
+  guest: boolean;
+  onHidden: (postId: string) => void;
+}) {
   const router = useRouter();
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -161,21 +173,7 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
 
       {post.body ? <p className="pulse-post-copy">{post.body}</p> : null}
 
-      {post.videoUrl && (
-        <div className="pulse-media pulse-video">
-          <video controls playsInline preload="metadata" poster={post.posterUrl}>
-            <source src={post.videoUrl} type="video/mp4" />
-          </video>
-          <span className="pulse-media-label"><Radio className="h-3 w-3" /> Video</span>
-        </div>
-      )}
-
-      {!post.videoUrl && post.imageUrl && (
-        <div className="pulse-media">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.imageUrl} alt="" loading="lazy" />
-        </div>
-      )}
+      <BlurredMedia imageUrl={post.imageUrl} videoUrl={post.videoUrl} posterUrl={post.posterUrl} explicit={!!post.explicit} />
 
       {post.poll && (
         <PollCard postId={post.id} initial={post.poll} guest={guest} mine={post.mine} onRequireAccount={requireAccount} />
@@ -193,6 +191,20 @@ function PostCard({ post, guest }: { post: FeedPost; guest: boolean }) {
         </button>
         <span><Eye className="h-4 w-4" /> {new Intl.NumberFormat("en", { notation: "compact" }).format(post.views)}</span>
       </div>
+
+      {!post.mine && (
+        <div className="pulse-report-row">
+          <ReportButton
+            targetType="POST"
+            targetId={post.id}
+            label="Report post"
+            onRequireAccount={guest ? requireAccount : undefined}
+            onReported={(reason) => {
+              if (reason === "UNDERAGE" || reason === "NON_CONSENSUAL") onHidden(post.id);
+            }}
+          />
+        </div>
+      )}
 
       <AnimatePresence>
         {commentsOpen && (
@@ -234,6 +246,10 @@ export default function FeedPage() {
   const [uploadError, setUploadError] = useState("");
   const [pollMode, setPollMode] = useState(false);
   const [pollDraft, setPollDraft] = useState<PollDraft>(emptyPollDraft);
+  const [eroticaPosts, setEroticaPosts] = useState<FeedPost[]>([]);
+  const [eroticaState, setEroticaState] = useState<"idle" | "loading" | "needsLogin" | "needsConfirm" | "ready" | "error">("idle");
+  const [canPostErotica, setCanPostErotica] = useState(false);
+  const [attest, setAttest] = useState(false);
 
   async function load() {
     const response = await fetch("/api/feed");
@@ -283,10 +299,38 @@ export default function FeedPage() {
     };
   }, [previewUrl]);
 
+  async function loadErotica() {
+    setEroticaState((current) => (current === "ready" ? current : "loading"));
+    const [response, adult] = await Promise.all([
+      fetch("/api/feed?board=erotica", { cache: "no-store" }).catch(() => null),
+      fetch("/api/me/adult", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    setCanPostErotica(!!adult?.canPost);
+    if (!response) return setEroticaState("error");
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) return setEroticaState("needsLogin");
+    if (response.status === 403 && data.needsAdultConfirm) return setEroticaState("needsConfirm");
+    if (!response.ok) return setEroticaState("error");
+    setEroticaPosts(data.posts ?? []);
+    setEroticaState("ready");
+  }
+
+  useEffect(() => {
+    if (activeTab === "erotica" && eroticaState === "idle") void loadErotica();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  function removePost(postId: string) {
+    setPosts((current) => current.filter((post) => post.id !== postId));
+    setEroticaPosts((current) => current.filter((post) => post.id !== postId));
+  }
+
   const visiblePosts = useMemo(() => {
+    if (activeTab === "erotica") return eroticaPosts;
     if (activeTab === "explore") return posts;
     return posts.filter((post) => (post.boards ?? [post.category]).includes(activeTab));
-  }, [activeTab, posts]);
+  }, [activeTab, posts, eroticaPosts]);
+  const eroticaMode = activeTab === "erotica";
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -296,18 +340,22 @@ export default function FeedPage() {
     }
     const body = draft.trim();
     if (posting) return;
-    if (pollMode) {
+    if (pollMode && !eroticaMode) {
       const problem = pollDraftProblem(pollDraft);
       if (problem) {
         setUploadError(problem);
         return;
       }
     } else if (!body && !mediaFile) return;
+    if (eroticaMode && !attest) {
+      setUploadError("Tick the box to confirm you own this content and everyone in it is 18+ and consented.");
+      return;
+    }
     setPosting(true);
     setUploadError("");
     let imageUrl = "";
     let videoUrl = "";
-    if (mediaFile && !pollMode) {
+    if (mediaFile && !(pollMode && !eroticaMode)) {
       const upload = new FormData();
       upload.set("file", mediaFile);
       const uploadResponse = await fetch("/api/uploads", { method: "POST", body: upload });
@@ -327,7 +375,8 @@ export default function FeedPage() {
         body,
         imageUrl,
         videoUrl,
-        ...(pollMode
+        ...(eroticaMode ? { erotica: true, attest } : {}),
+        ...(pollMode && !eroticaMode
           ? {
               poll: {
                 question: pollDraft.question.trim(),
@@ -343,7 +392,10 @@ export default function FeedPage() {
       setMediaFile(null);
       setMediaKind(null);
       setPreviewUrl("");
-      if (pollMode) {
+      setAttest(false);
+      if (eroticaMode) {
+        await loadErotica();
+      } else if (pollMode) {
         setPollMode(false);
         setPollDraft(emptyPollDraft());
         setActiveTab("poll");
@@ -417,13 +469,30 @@ export default function FeedPage() {
         <p className="pulse-tab-hint">
           {activeTab === "explore" && "Explore is every post."}
           {activeTab === "trending" && "Trending is posts people are checking and liking."}
-          {activeTab === "erotica" && "Erotica is videos or posts with spicy wording."}
+          {activeTab === "erotica" && "Explicit posts from verified members. 18+ only, media stays blurred until you tap."}
           {activeTab === "poll" && "Polls let the community vote on a question."}
         </p>
 
+        {eroticaMode && (guest || eroticaState === "needsLogin" || eroticaState === "needsConfirm") ? (
+          <EroticaGate
+            signedIn={!guest && eroticaState !== "needsLogin"}
+            onConfirmed={() => {
+              setEroticaState("loading");
+              void loadErotica();
+            }}
+          />
+        ) : (
+        <>
+        {eroticaMode && eroticaState === "ready" && !canPostErotica ? (
+          <div className="pulse-composer mt-4">
+            <p className="composer-notice !border-0">
+              Only verified members can post to Erotica. <Link href="/profile">Verify your profile</Link> to share here.
+            </p>
+          </div>
+        ) : (eroticaMode && eroticaState !== "ready") ? null : (
         <form id="feed-composer" onSubmit={publish} className="pulse-composer mt-4">
           <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hooks247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
-          {pollMode && <PollBuilder value={pollDraft} onChange={setPollDraft} />}
+          {pollMode && !eroticaMode && <PollBuilder value={pollDraft} onChange={setPollDraft} />}
           {previewUrl && (
             <div className="pulse-upload-preview">
               {mediaKind === "video" ? <video src={previewUrl} controls playsInline /> : (
@@ -433,33 +502,42 @@ export default function FeedPage() {
               <button type="button" onClick={removeMedia} aria-label="Remove upload"><X className="h-4 w-4" /></button>
             </div>
           )}
+          {eroticaMode && (
+            <label className="attest-check">
+              <input type="checkbox" checked={attest} onChange={(event) => setAttest(event.target.checked)} />
+              <span>I own this content. Everyone shown is 18 or older and agreed to be filmed or photographed and to have it posted here.</span>
+            </label>
+          )}
           {uploadError && <p className="pulse-upload-error">{uploadError}</p>}
           <div className="pulse-composer-footer">
             <div className="pulse-upload-actions">
-              {!pollMode && <label>
+              {!(pollMode && !eroticaMode) && <label>
                 <ImagePlus className="h-4 w-4" /> Photo
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => chooseMedia(event.target.files?.[0])} />
               </label>}
-              {!pollMode && <label>
+              {!(pollMode && !eroticaMode) && <label>
                 <Video className="h-4 w-4" /> Video
-                <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => chooseMedia(event.target.files?.[0])} />
+                <input type="file" accept="video/mp4,video/webm" onChange={(event) => chooseMedia(event.target.files?.[0])} />
               </label>}
-              <button type="button" onClick={togglePoll} data-active={pollMode} aria-pressed={pollMode}>
-                <BarChart3 className="h-4 w-4" /> Poll
-              </button>
+              {!eroticaMode && (
+                <button type="button" onClick={togglePoll} data-active={pollMode} aria-pressed={pollMode}>
+                  <BarChart3 className="h-4 w-4" /> Poll
+                </button>
+              )}
             </div>
             <span>{draft.length}/1000</span>
-            <button type="submit" className="btn-primary !px-5 !py-2 text-xs" disabled={(pollMode ? !!pollDraftProblem(pollDraft) : !draft.trim() && !mediaFile) || posting}>{posting ? "Publishing..." : pollMode ? "Post poll" : "Post update"}</button>
+            <button type="submit" className="btn-primary !px-5 !py-2 text-xs" disabled={(pollMode && !eroticaMode ? !!pollDraftProblem(pollDraft) : (!draft.trim() && !mediaFile) || (eroticaMode && !attest)) || posting}>{posting ? "Publishing..." : pollMode && !eroticaMode ? "Post poll" : eroticaMode ? "Post to Erotica" : "Post update"}</button>
           </div>
         </form>
+        )}
 
-        {loading ? (
+        {loading || (eroticaMode && (eroticaState === "loading" || eroticaState === "idle")) ? (
           <div className="mt-5 space-y-4">
             {Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-80 animate-pulse rounded-lg bg-white/[0.05]" />)}
           </div>
         ) : visiblePosts.length ? (
           <div className="mt-5 space-y-4">
-            {visiblePosts.map((post) => <PostCard key={post.id} post={post} guest={guest} />)}
+            {visiblePosts.map((post) => <PostCard key={post.id} post={post} guest={guest} onHidden={removePost} />)}
           </div>
         ) : (
           <div className="empty-panel mt-5 flex min-h-56 flex-col items-center justify-center px-6 text-center">
@@ -467,12 +545,18 @@ export default function FeedPage() {
             <h2 className="font-display mt-3 font-bold">Nothing in {TABS.find((tab) => tab.id === activeTab)?.label} yet</h2>
             <p className="mt-2 text-sm text-muted">
               {activeTab === "trending" && "A post lands here after people like and comment on it."}
-              {activeTab === "erotica" && "Add a video or spicy text and it shows here automatically."}
+              {activeTab === "erotica" && (eroticaState === "error" ? "Erotica could not load. Check your connection and try again." : "Verified members can share explicit posts here.")}
               {activeTab === "poll" && "Tap Poll in the composer to ask the community something."}
               {activeTab === "explore" && "Be the first to post."}
             </p>
-            <button type="button" className="section-link mt-3" onClick={() => setActiveTab("explore")}>Open Explore</button>
+            {eroticaMode && eroticaState === "error" ? (
+              <button type="button" className="section-link mt-3" onClick={() => void loadErotica()}>Try again</button>
+            ) : (
+              <button type="button" className="section-link mt-3" onClick={() => setActiveTab("explore")}>Open Explore</button>
+            )}
           </div>
+        )}
+        </>
         )}
       </main>
 

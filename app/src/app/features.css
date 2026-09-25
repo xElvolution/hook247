@@ -333,3 +333,151 @@
   color: var(--color-muted);
   font-size: 0.68rem;
 }
+
+/* Erotica gate and explicit media */
+.erotica-gate {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid rgba(223, 58, 106, 0.35);
+  border-radius: 0.6rem;
+  background: linear-gradient(180deg, rgba(223, 58, 106, 0.08), rgba(27, 25, 28, 0.9));
+  padding: 1.6rem 1.25rem;
+  text-align: center;
+}
+
+.erotica-gate h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.erotica-gate p {
+  max-width: 30rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.erotica-gate-check {
+  display: flex;
+  max-width: 30rem;
+  align-items: flex-start;
+  gap: 0.6rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  background: #141315;
+  padding: 0.75rem;
+  text-align: left;
+  color: #efe8ec;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.erotica-gate-check input,
+.attest-check input {
+  margin-top: 0.15rem;
+  height: 1rem;
+  width: 1rem;
+  flex-shrink: 0;
+  accent-color: var(--color-brand);
+}
+
+.erotica-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.erotica-gate-actions .btn-primary:disabled {
+  opacity: 0.45;
+}
+
+.attest-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  border-top: 1px solid var(--color-line);
+  padding: 0.7rem 0.8rem;
+  color: #e6dfe3;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.composer-notice {
+  border-top: 1px solid var(--color-line);
+  padding: 0.7rem 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+}
+
+.composer-notice a {
+  color: var(--color-brand-2);
+  font-weight: 800;
+}
+
+.explicit-media {
+  position: relative;
+}
+
+.explicit-media[data-hidden="true"] img,
+.explicit-media[data-hidden="true"] video {
+  filter: blur(32px) saturate(0.7);
+  transform: scale(1.08);
+  pointer-events: none;
+}
+
+.explicit-media {
+  overflow: hidden;
+}
+
+.explicit-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  background: rgba(10, 9, 11, 0.35);
+  color: #fff;
+  text-align: center;
+}
+
+.explicit-cover strong {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.explicit-cover span {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.explicit-rehide {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.6rem;
+  z-index: 2;
+  border-radius: 999px;
+  background: rgba(10, 9, 11, 0.7);
+  padding: 0.25rem 0.7rem;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.pulse-report-row {
+  padding: 0 1rem 0.8rem;
+}

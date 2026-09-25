@@ -11,10 +11,15 @@ const schema = z.object({
   details: z.string().max(1000).default(""),
 });
 
+/** Reasons serious enough that a reported post is held out of view until an admin looks. */
+const HOLD_REASONS = new Set<ReportReason>([ReportReason.UNDERAGE, ReportReason.NON_CONSENSUAL]);
+
 /**
  * POST /api/report — a member flags a profile, post or comment. The row lands
- * in the admin queue at /502test/reports; nothing is hidden automatically, because
- * auto-hiding on report is a griefing tool.
+ * in the admin queue at /502test/reports. Most reports hide nothing on their
+ * own, because auto-hiding is a griefing tool; the exception is a post reported
+ * as showing a minor or shared without consent, which is held immediately and
+ * restored from the queue if the report turns out to be false.
  */
 export async function POST(req: Request) {
   const reporterId = await getActiveSessionUserId();
@@ -88,6 +93,16 @@ export async function POST(req: Request) {
       ok: true,
       duplicate: true,
       message: "You have already reported this. Our team is reviewing it.",
+    });
+  }
+
+  if (targetPostId && HOLD_REASONS.has(reason)) {
+    await db.post.updateMany({
+      where: { id: targetPostId, hiddenAt: null },
+      data: {
+        hiddenAt: new Date(),
+        hideReason: `Held for review: reported as ${reason === ReportReason.UNDERAGE ? "underage" : "non-consensual"}`,
+      },
     });
   }
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ReportStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
-import { resolveReport, banUser, hidePost } from "../actions";
+import { resolveReport, banUser, hidePost, unhidePost, deletePost } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,15 @@ export default async function ReportsPage({
   const posts = postIds.length
     ? await db.post.findMany({
         where: { id: { in: postIds } },
-        select: { id: true, body: true, hiddenAt: true },
+        select: {
+          id: true,
+          body: true,
+          hiddenAt: true,
+          hideReason: true,
+          imageUrl: true,
+          videoUrl: true,
+          category: true,
+        },
       })
     : [];
   const postById = new Map(posts.map((p) => [p.id, p]));
@@ -138,10 +146,24 @@ export default async function ReportsPage({
                   ) : null}
 
                   {post ? (
-                    <p className="mt-1.5 rounded bg-bg/60 p-2 text-sm">
-                      <span className="text-muted">Post:</span> {post.body.slice(0, 240)}
-                      {post.hiddenAt ? <Badge tone="muted">hidden</Badge> : null}
-                    </p>
+                    <div className="mt-1.5 rounded bg-bg/60 p-2 text-sm">
+                      <p>
+                        <span className="text-muted">Post:</span> {post.body.slice(0, 240) || <em className="text-muted">no text</em>}{" "}
+                        {post.category === "erotica" ? <Badge tone="warn">erotica</Badge> : null}{" "}
+                        {post.hiddenAt ? <Badge tone="muted">hidden</Badge> : null}
+                      </p>
+                      {post.hideReason ? (
+                        <p className="mt-1 text-xs text-amber-300">{post.hideReason}</p>
+                      ) : null}
+                      {post.videoUrl ? (
+                        <video src={post.videoUrl} controls preload="metadata" className="mt-2 max-h-56 rounded" />
+                      ) : post.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={post.imageUrl} alt="Reported media" className="mt-2 max-h-56 rounded object-contain" />
+                      ) : null}
+                    </div>
+                  ) : r.targetPostId ? (
+                    <p className="mt-1.5 text-xs text-muted">The reported post has been deleted.</p>
                   ) : null}
 
                   {r.status === "OPEN" ? (
@@ -173,6 +195,21 @@ export default async function ReportsPage({
                             value={`Report: ${r.reason}`}
                           />
                           <Btn tone="bad">Ban reported user</Btn>
+                        </form>
+                      ) : null}
+
+                      {post && post.hiddenAt ? (
+                        <form action={unhidePost}>
+                          <input type="hidden" name="postId" value={post.id} />
+                          <Btn tone="good">Restore post</Btn>
+                        </form>
+                      ) : null}
+
+                      {post ? (
+                        <form action={deletePost}>
+                          <input type="hidden" name="postId" value={post.id} />
+                          <input type="hidden" name="reason" value={`Report: ${r.reason}`} />
+                          <Btn tone="bad">Delete post</Btn>
                         </form>
                       ) : null}
 

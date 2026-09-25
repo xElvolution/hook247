@@ -81,6 +81,7 @@ export async function hidePost(formData: FormData) {
   });
   await logAdminAction("post.hide", "post", postId, reason);
   revalidatePath("/502test/content");
+  revalidatePath("/502test/reports");
 }
 
 export async function unhidePost(formData: FormData) {
@@ -94,6 +95,37 @@ export async function unhidePost(formData: FormData) {
   });
   await logAdminAction("post.unhide", "post", postId);
   revalidatePath("/502test/content");
+  revalidatePath("/502test/reports");
+}
+
+/**
+ * Remove a post for good, including its uploaded media on disk. Reports that
+ * pointed at it keep their row (and the reason) for the audit trail.
+ */
+export async function deletePost(formData: FormData) {
+  await requireAdmin();
+  const postId = String(formData.get("postId") ?? "");
+  const reason = String(formData.get("reason") ?? "").slice(0, 500);
+  if (!postId) return;
+
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    select: { imageUrl: true, videoUrl: true, authorId: true },
+  });
+  if (!post) return;
+  await db.post.delete({ where: { id: postId } });
+
+  const { unlink } = await import("node:fs/promises");
+  const path = await import("node:path");
+  for (const url of [post.imageUrl, post.videoUrl]) {
+    if (!url.startsWith("/uploads/")) continue;
+    const name = path.basename(url);
+    await unlink(path.join(process.cwd(), "public", "uploads", name)).catch(() => undefined);
+  }
+
+  await logAdminAction("post.delete", "post", postId, reason || `author ${post.authorId}`);
+  revalidatePath("/502test/content");
+  revalidatePath("/502test/reports");
 }
 
 export async function resolveReport(formData: FormData) {

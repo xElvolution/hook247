@@ -63,6 +63,7 @@ enum ReportReason {
   HARASSMENT
   NUDITY
   UNDERAGE
+  NON_CONSENSUAL
   SCAM
   IMPERSONATION
   OTHER
@@ -104,6 +105,8 @@ model User {
   banReason      String    @default("")
   /// Temporary suspension. Unlike a ban this lapses on its own.
   suspendedUntil DateTime?
+  /// When the member confirmed they are 18+ to open the Erotica board.
+  adultConfirmedAt DateTime?
 
   /// Shareable code for /signup?ref=CODE. Generated at signup.
   referralCode String  @unique
@@ -250,6 +253,9 @@ model Post {
   /// trail but are filtered out of the feed.
   hiddenAt   DateTime?
   hideReason String    @default("")
+  /// Erotica posts only: when the author attested they own the content and
+  /// everyone shown is 18+ and consented.
+  adultAttestedAt DateTime?
 
   author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes    PostLike[]

@@ -8,6 +8,7 @@ const REASONS = [
   { value: "HARASSMENT", label: "Harassment or abuse" },
   { value: "NUDITY", label: "Explicit content" },
   { value: "UNDERAGE", label: "Appears underage" },
+  { value: "NON_CONSENSUAL", label: "Shared without consent" },
   { value: "SCAM", label: "Scam or fraud" },
   { value: "IMPERSONATION", label: "Impersonation / fake profile" },
   { value: "OTHER", label: "Something else" },
@@ -17,10 +18,14 @@ export default function ReportButton({
   targetType,
   targetId,
   label = "Report",
+  onReported,
+  onRequireAccount,
 }: {
   targetType: "USER" | "POST" | "COMMENT";
   targetId: string;
   label?: string;
+  onReported?: (reason: string) => void;
+  onRequireAccount?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<string>(REASONS[0].value);
@@ -43,11 +48,13 @@ export default function ReportButton({
     setBusy(false);
 
     if (!response.ok) {
+      if (response.status === 401 && onRequireAccount) return onRequireAccount();
       setError(data.error ?? "The report could not be sent.");
       return;
     }
     setDone(data.message ?? "Thanks. Our team will review this.");
     setOpen(false);
+    onReported?.(reason);
   }
 
   if (done) {
@@ -62,7 +69,7 @@ export default function ReportButton({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => (onRequireAccount ? onRequireAccount() : setOpen(true))}
         className="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition hover:text-ink"
       >
         <Flag className="h-3.5 w-3.5" /> {label}
