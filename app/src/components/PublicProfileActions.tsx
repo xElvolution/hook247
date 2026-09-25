@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { MessageCircle, User } from "lucide-react";
 import ReportButton from "./ReportButton";
+import TipButton from "./coins/TipButton";
 import { formatWhatsApp, whatsappHref } from "@/lib/whatsapp";
 
 export default function PublicProfileActions({
+  authed,
+  tippable = false,
   isMine,
   profileName,
   userId,
@@ -18,6 +21,7 @@ export default function PublicProfileActions({
   userId: string;
   whatsapp: string;
   country?: string;
+  tippable?: boolean;
 }) {
   const href = whatsappHref(whatsapp, profileName, country);
 
@@ -40,6 +44,16 @@ export default function PublicProfileActions({
       )}
       {whatsapp && (
         <p className="mt-2 text-xs text-muted">Number: {formatWhatsApp(whatsapp, country)}</p>
+      )}
+      {tippable && (
+        <TipButton
+          toUserId={userId}
+          toName={profileName}
+          source="profile"
+          guest={!authed}
+          className="btn-ghost mt-2 w-full text-sm"
+          label={`Send ${profileName} a tip`}
+        />
       )}
       <p className="mt-3 text-xs text-muted">
         No account needed. Chat on WhatsApp to ask availability and rates.

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import PollCard, { type PollData } from "@/components/feed/PollCard";
 import ReportButton from "@/components/ReportButton";
+import TipButton from "@/components/coins/TipButton";
 import EroticaGate from "@/components/feed/EroticaGate";
 import BlurredMedia from "@/components/feed/BlurredMedia";
 import PollBuilder, { emptyPollDraft, pollDraftProblem, type PollDraft } from "@/components/feed/PollBuilder";
@@ -49,6 +50,7 @@ type FeedPost = {
     age: number | null;
     avatarUrl: string;
     verified: boolean;
+    tippable?: boolean;
   };
   likeCount: number;
   commentCount: number;
@@ -189,6 +191,9 @@ function PostCard({
         <button type="button" onClick={share}>
           <Share2 className="h-[18px] w-[18px]" /> Share
         </button>
+        {post.author.tippable && !post.mine && (
+          <TipButton toUserId={post.author.userId} toName={post.author.displayName} source="post" postId={post.id} guest={guest} />
+        )}
         <span><Eye className="h-4 w-4" /> {new Intl.NumberFormat("en", { notation: "compact" }).format(post.views)}</span>
       </div>
 

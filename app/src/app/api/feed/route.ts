@@ -114,6 +114,7 @@ export async function GET(req: Request) {
         age: p.author.profile ? ageFrom(p.author.profile.birthDate) : null,
         avatarUrl: p.author.profile?.avatarUrl ?? "",
         verified: p.author.profile?.verified ?? false,
+        tippable: p.author.profile?.role === "ESCORT",
       },
       likeCount: p._count.likes,
       commentCount: p._count.comments,

@@ -2,6 +2,7 @@ import type { ServiceRate } from "./profileOptions";
 
 export type PublicProfile = {
   userId: string;
+  role?: "ESCORT" | "CLIENT";
   displayName: string;
   age: number;
   gender: "MALE" | "FEMALE" | "NONBINARY";

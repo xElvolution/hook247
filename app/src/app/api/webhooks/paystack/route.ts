@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/paystack";
 import { fulfilPayment } from "@/lib/fulfilPayment";
+import { fulfilCoinPurchase, isCoinReference } from "@/lib/coinPurchases";
+import { settleTransferEvent } from "@/lib/coinPayouts";
 
 /**
  * Paystack calls this webhook when a transaction reaches a final state.
@@ -26,6 +28,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Malformed payload" }, { status: 400 });
   }
 
+  if (event.event === "transfer.success" || event.event === "transfer.failed" || event.event === "transfer.reversed") {
+    const reference = event.data?.reference;
+    if (!reference) return NextResponse.json({ ok: true, ignored: "no reference" });
+    try {
+      const state = await settleTransferEvent(event.event, reference);
+      return NextResponse.json({ ok: true, state, reference });
+    } catch (err) {
+      console.error("Transfer webhook failed:", err);
+      return NextResponse.json({ ok: false, retry: true, reference }, { status: 500 });
+    }
+  }
+
   if (event.event !== "charge.success") {
     return NextResponse.json({ ok: true, ignored: event.event });
   }
@@ -33,6 +47,20 @@ export async function POST(request: Request) {
   const reference = event.data?.reference;
   if (!reference) {
     return NextResponse.json({ error: "Missing reference" }, { status: 400 });
+  }
+
+  if (isCoinReference(reference)) {
+    try {
+      const result = await fulfilCoinPurchase(reference);
+      if (!result.ok && result.state === "pending") {
+        // Paystack said success but verify did not agree yet: ask for a retry.
+        return NextResponse.json({ ok: false, retry: true, reference }, { status: 500 });
+      }
+      return NextResponse.json({ ok: result.ok, state: result.state, reference });
+    } catch (err) {
+      console.error("Coin purchase webhook failed:", err);
+      return NextResponse.json({ ok: false, retry: true, reference }, { status: 500 });
+    }
   }
 
   try {

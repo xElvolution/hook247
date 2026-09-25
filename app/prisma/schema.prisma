@@ -131,6 +131,11 @@ model User {
   reportsAgainst     Report[]            @relation("reportedUser")
   reviewsWritten     ListingReview[]     @relation("reviewAuthor")
   pollVotes          PollVote[]
+  coinWallet         CoinWallet?
+  coinTransactions   CoinTransaction[]
+  coinPurchases      CoinPurchase[]
+  coinWithdrawals    CoinWithdrawal[]
+  payoutAccount      PayoutAccount?
 
   @@index([bannedAt])
   @@index([createdAt])
@@ -499,4 +504,128 @@ model PollVote {
 
   @@unique([optionId, userId])
   @@index([pollId, userId])
+}
+
+enum CoinTxType {
+  PURCHASE
+  TIP_SENT
+  TIP_RECEIVED
+  WITHDRAWAL_REQUEST
+  WITHDRAWAL_PAID
+  WITHDRAWAL_REFUND
+  ADMIN_ADJUST
+}
+
+/// Cached coin balance. `balance` is spendable; `held` is coins locked in a
+/// withdrawal request that has not been paid or rejected yet. Both are only
+/// ever changed together with a CoinTransaction row, inside one transaction.
+model CoinWallet {
+  userId         String   @id
+  balance        Int      @default(0)
+  held           Int      @default(0)
+  lifetimeEarned Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+/// Append-only coin ledger. Rows are never updated or deleted (a database
+/// trigger enforces this). `amount` is the signed change to the spendable
+/// balance and `balanceAfter` the balance once it was applied.
+model CoinTransaction {
+  id             String     @id @default(cuid())
+  userId         String
+  type           CoinTxType
+  amount         Int
+  balanceAfter   Int
+  /// Unique key that makes retries safe (Paystack reference, tip nonce...).
+  idempotencyKey String?    @unique
+  counterpartyId String?
+  postId         String?
+  liveSessionId  String?
+  giftId         String?
+  purchaseId     String?
+  withdrawalId   String?
+  source         String     @default("")
+  note           String     @default("")
+  createdAt      DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([liveSessionId])
+}
+
+model CoinPack {
+  id        String   @id @default(cuid())
+  name      String
+  coins     Int
+  priceKobo Int
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+/// One row per coin checkout. `reference` is what Paystack echoes back, so it
+/// is the idempotency key for crediting coins.
+model CoinPurchase {
+  id         String        @id @default(cuid())
+  userId     String
+  packId     String
+  coins      Int
+  amountKobo Int
+  reference  String        @unique
+  status     PaymentStatus @default(PENDING)
+  creditedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model CoinSettings {
+  id                       String   @id @default("default")
+  /// What one coin pays out to an escort, in kobo (750 = N7.50).
+  payoutKoboPerCoin        Int      @default(750)
+  minWithdrawalCoins       Int      @default(1000)
+  /// Only switch on once Paystack Transfers are enabled on the account.
+  paystackTransfersEnabled Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+model CoinWithdrawal {
+  id              String           @id @default(cuid())
+  userId          String
+  coins           Int
+  amountKobo      Int
+  status          WithdrawalStatus @default(REQUESTED)
+  bankCode        String
+  bankName        String
+  accountNumber   String
+  accountName     String
+  payoutReference String           @default("")
+  transferCode    String           @default("")
+  adminNote       String           @default("")
+  createdAt       DateTime         @default(now())
+  resolvedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PayoutAccount {
+  userId        String   @id
+  bankCode      String
+  bankName      String
+  accountNumber String
+  accountName   String
+  recipientCode String   @default("")
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

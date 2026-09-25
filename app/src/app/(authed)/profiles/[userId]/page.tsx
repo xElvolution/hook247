@@ -38,6 +38,7 @@ const getPublicProfile = cache(async (userId: string): Promise<PublicProfile | n
   if (!profile) return null;
 
   return {
+    role: profile.role,
     userId: profile.userId,
     displayName: profile.displayName,
     age: ageFrom(profile.birthDate),
@@ -201,6 +202,7 @@ export default async function PublicProfilePage({
             isMine={sessionUserId === profile.userId}
             profileName={profile.displayName}
             userId={profile.userId}
+            tippable={profile.role === "ESCORT"}
             whatsapp={profile.whatsapp}
             country={profile.country}
           />

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { leaveAction } from "@/app/502test/enter/actions";
 
-type Item = { href: string; label: string; badgeKey?: "reports" | "withdrawals" };
+type Item = { href: string; label: string; badgeKey?: "reports" | "withdrawals" | "coinPayouts" };
 
 const GROUPS: { id: string; label: string; items: Item[] }[] = [
   {
@@ -30,6 +30,8 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { href: "/502test/commerce", label: "Plans" },
       { href: "/502test/payments", label: "Payments" },
       { href: "/502test/withdrawals", label: "Withdrawals", badgeKey: "withdrawals" },
+      { href: "/502test/coins", label: "Coins" },
+      { href: "/502test/coin-payouts", label: "Coin payouts", badgeKey: "coinPayouts" },
       { href: "/502test/finance", label: "Finance" },
     ],
   },
@@ -53,7 +55,7 @@ export default function AdminShell({
   badges,
   children,
 }: {
-  badges: { reports: number; withdrawals: number };
+  badges: { reports: number; withdrawals: number; coinPayouts?: number };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -102,7 +104,14 @@ export default function AdminShell({
   }
 
   function badgeFor(item: Item) {
-    const count = item.badgeKey === "reports" ? badges.reports : item.badgeKey === "withdrawals" ? badges.withdrawals : 0;
+    const count =
+      item.badgeKey === "reports"
+        ? badges.reports
+        : item.badgeKey === "withdrawals"
+          ? badges.withdrawals
+          : item.badgeKey === "coinPayouts"
+            ? badges.coinPayouts ?? 0
+            : 0;
     if (!count) return null;
     return <span className="admin-nav-badge">{count}</span>;
   }

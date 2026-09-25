@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import NavSearch from "@/components/NavSearch";
 import {
   CircleHelp,
+  Coins,
   Gift,
   Home,
   Mail,
@@ -35,6 +36,7 @@ function bottomMenu(authed: boolean): { label: string; href: string; icon: Lucid
 
 const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "My profile", href: "/profile", icon: User },
+  { label: "Coins", href: "/coins", icon: Coins },
   { label: "Referrals", href: "/referrals", icon: Gift },
   { label: "Premium", href: "/premium", icon: Zap },
   { label: "FAQs", href: "/faqs", icon: CircleHelp },

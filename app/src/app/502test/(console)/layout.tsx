@@ -28,17 +28,19 @@ export default async function AdminLayout({
   // badge is cosmetic — fall back to hiding it rather than taking down the shell.
   let openReports = 0;
   let pendingWithdrawals = 0;
+  let pendingCoinPayouts = 0;
   try {
-    [openReports, pendingWithdrawals] = await Promise.all([
+    [openReports, pendingWithdrawals, pendingCoinPayouts] = await Promise.all([
       db.report.count({ where: { status: ReportStatus.OPEN } }),
       db.withdrawal.count({ where: { status: "REQUESTED" } }),
+      db.coinWithdrawal.count({ where: { status: { in: ["REQUESTED", "APPROVED"] } } }),
     ]);
   } catch (err) {
     console.error("[502test] badge counts failed:", err);
   }
 
   return (
-    <AdminShell badges={{ reports: openReports, withdrawals: pendingWithdrawals }}>
+    <AdminShell badges={{ reports: openReports, withdrawals: pendingWithdrawals, coinPayouts: pendingCoinPayouts }}>
       {children}
     </AdminShell>
   );
