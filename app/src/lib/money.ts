@@ -12,11 +12,26 @@ export async function getSettings() {
   });
 }
 
-export async function settleCommissions() {
-  await db.referralEarning.updateMany({
-    where: { status: "PENDING", availableAt: { lte: new Date() } },
-    data: { status: "AVAILABLE" },
+// Settling is idempotent, and it runs on every commission read plus the cron
+// tick. Coalesce concurrent callers onto one query and skip re-running it
+// within a short window so bursts of reads don't each grab a pool connection.
+const SETTLE_INTERVAL_MS = 30_000;
+let lastSettledAt = 0;
+let settling: Promise<void> | null = null;
+
+export async function settleCommissions(force = false) {
+  if (settling) return settling;
+  if (!force && Date.now() - lastSettledAt < SETTLE_INTERVAL_MS) return;
+  settling = (async () => {
+    await db.referralEarning.updateMany({
+      where: { status: "PENDING", availableAt: { lte: new Date() } },
+      data: { status: "AVAILABLE" },
+    });
+    lastSettledAt = Date.now();
+  })().finally(() => {
+    settling = null;
   });
+  return settling;
 }
 
 export function isSubscriptionActive(expiresAt: Date | null | undefined) {

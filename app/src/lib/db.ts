@@ -11,8 +11,12 @@ function neonUrl(raw: string) {
   };
   // Neon’s pooler rejects Prisma’s prepared statements unless this is set.
   add("pgbouncer", "true");
-  add("connect_timeout", "8");
-  add("pool_timeout", "8");
+  // Neon suspends idle computes; a cold start can take several seconds, so
+  // give the handshake and the pool enough headroom to ride it out instead of
+  // failing requests with P1001/P2024 while the compute wakes.
+  add("connect_timeout", "15");
+  add("pool_timeout", "20");
+  add("connection_limit", "5");
   return url;
 }
 

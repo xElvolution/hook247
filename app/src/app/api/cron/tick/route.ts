@@ -7,6 +7,6 @@ export async function GET(req: Request) {
   if (!secret || sent !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  await settleCommissions();
+  await settleCommissions(true);
   return NextResponse.json({ ok: true, settled: true, at: new Date().toISOString() });
 }
