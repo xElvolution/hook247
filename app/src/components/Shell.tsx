@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRealtimeEvent } from "@/lib/realtimeClient";
 import { AnimatePresence, motion } from "framer-motion";
 import NavSearch from "@/components/NavSearch";
 import {
@@ -12,6 +13,8 @@ import {
   Home,
   Mail,
   Menu,
+  MessageCircle,
+  MessagesSquare,
   Newspaper,
   Radio,
   User,
@@ -24,11 +27,12 @@ const PRIMARY_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Profiles", href: "/", icon: Home },
   { label: "Live", href: "/live", icon: Radio },
   { label: "Feed", href: "/feed", icon: Newspaper },
+  { label: "Lounge", href: "/lounge", icon: MessagesSquare },
 ];
 
 function bottomMenu(authed: boolean): { label: string; href: string; icon: LucideIcon }[] {
   return [
-    ...PRIMARY_MENU,
+    ...PRIMARY_MENU.filter((item) => item.href !== "/lounge"),
     { label: authed ? "Profile" : "Get hooked", href: authed ? "/profile" : "/signup", icon: User },
     { label: "Boost", href: "/premium", icon: Zap },
   ];
@@ -36,12 +40,52 @@ function bottomMenu(authed: boolean): { label: string; href: string; icon: Lucid
 
 const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "My profile", href: "/profile", icon: User },
+  { label: "Messages", href: "/matches", icon: MessageCircle },
   { label: "Coins", href: "/coins", icon: Coins },
   { label: "Referrals", href: "/referrals", icon: Gift },
   { label: "Premium", href: "/premium", icon: Zap },
   { label: "FAQs", href: "/faqs", icon: CircleHelp },
   { label: "Contact", href: "/contact", icon: Mail },
 ];
+
+const MEMBER_ONLY = new Set(["/profile", "/matches"]);
+
+/** Unread direct messages, kept fresh by the realtime socket. */
+function useUnreadMessages(authed: boolean) {
+  const [count, setCount] = useState(0);
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!authed) return;
+    let alive = true;
+    const refresh = () =>
+      fetch("/api/messages/unread", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { total: 0 }))
+        .then((d) => alive && setCount(d.total ?? 0))
+        .catch(() => undefined);
+    refresh();
+    const t = window.setInterval(() => document.visibilityState === "visible" && refresh(), 60000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [authed, pathname]);
+  useRealtimeEvent<{ matchId: string; message: { senderId: string } }>("dm:message", ({ matchId, message }) => {
+    if (!authed) return;
+    if (window.location.pathname === `/matches/${matchId}`) return;
+    fetch("/api/messages/unread", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCount(d.total ?? 0))
+      .catch(() => undefined);
+    void message;
+  });
+  useRealtimeEvent("dm:seen", () => {
+    fetch("/api/messages/unread", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCount(d.total ?? 0))
+      .catch(() => undefined);
+  });
+  return authed ? count : 0;
+}
 
 function Brand() {
   return (
@@ -64,6 +108,7 @@ export default function Shell({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const unread = useUnreadMessages(authed);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -84,6 +129,7 @@ export default function Shell({
             >
               <item.icon className="h-[18px] w-[18px]" strokeWidth={2.1} />
               <span>{item.label}</span>
+              {item.href === "/matches" && unread > 0 ? <b className="nav-unread">{unread > 99 ? "99+" : unread}</b> : null}
             </Link>
           );
         })}
@@ -110,6 +156,12 @@ export default function Shell({
 
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             <NavSearch />
+            {authed ? (
+              <Link href="/matches" className="icon-button header-dm-button" aria-label={unread ? `Messages, ${unread} unread` : "Messages"}>
+                <MessageCircle className="h-5 w-5" />
+                {unread > 0 ? <b className="nav-unread is-dot">{unread > 9 ? "9+" : unread}</b> : null}
+              </Link>
+            ) : null}
             {authed ? (
               <Link href="/profile" className="header-auth-btn btn-ghost">
                 <User className="h-3.5 w-3.5" />
@@ -162,7 +214,7 @@ export default function Shell({
               <p className="side-nav-label">Browse</p>
               {menu(PRIMARY_MENU)}
               <p className="side-nav-label mt-7">Account</p>
-              {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => item.href !== "/profile"))}
+              {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => !MEMBER_ONLY.has(item.href)))}
 
               {!authed && (
                 <div className="mt-7 grid gap-2">
@@ -185,7 +237,7 @@ export default function Shell({
           {menu(PRIMARY_MENU)}
 
           <p className="side-nav-label mt-7">Account</p>
-          {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => item.href !== "/profile"))}
+          {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => !MEMBER_ONLY.has(item.href)))}
 
           <Link href="/premium" className="premium-note mt-auto">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#df3a6a]/15 text-[#e7658a]">

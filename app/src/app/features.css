@@ -1659,3 +1659,352 @@
   border-radius: 50%;
   font-size: 1.2rem;
 }
+
+/* ---------- messages ---------- */
+
+.nav-unread {
+  display: inline-flex;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #df3a6a;
+  padding: 0 0.3rem;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.header-dm-button {
+  position: relative;
+}
+
+.nav-unread.is-dot {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.2rem;
+  margin: 0;
+  box-shadow: 0 0 0 2px #121214;
+}
+
+.dm-lounge-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-line);
+  border-radius: 9999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dm-skeleton {
+  height: 4.6rem;
+  border-radius: 1rem;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  background-size: 200% 100%;
+  animation: dm-shimmer 1.4s linear infinite;
+}
+
+@keyframes dm-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.dm-section-label {
+  margin-bottom: 0.6rem;
+  color: #ef789a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dm-new-rail {
+  display: flex;
+  gap: 0.9rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  scrollbar-width: none;
+}
+
+.dm-new-item {
+  display: flex;
+  width: 4.6rem;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.dm-new-item > span:last-child {
+  max-width: 100%;
+}
+
+.dm-new-ring {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #df3a6a, #f59e0b);
+  padding: 2px;
+}
+
+.dm-new-ring > * {
+  border: 2px solid #121214;
+}
+
+.dm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  border-radius: 1rem;
+  padding: 0.7rem;
+  transition: background 0.15s ease;
+}
+
+.dm-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dm-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.dm-row.is-unread .dm-preview {
+  color: #fff;
+  font-weight: 600;
+}
+
+.dm-unread {
+  display: inline-flex;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  margin-left: auto;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #df3a6a;
+  padding: 0 0.35rem;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.dm-thread {
+  height: calc(100svh - 170px);
+}
+
+@media (min-width: 768px) {
+  .dm-thread {
+    height: calc(100vh - 120px);
+  }
+}
+
+.dm-online-dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 0.7rem;
+  width: 0.7rem;
+  border: 2px solid #1b191c;
+  border-radius: 9999px;
+  background: #34d399;
+}
+
+.dm-day {
+  margin: 1rem 0 0.4rem;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.dm-bubble {
+  display: flex;
+  max-width: 78%;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.15rem 0.5rem;
+  border-radius: 1.1rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.dm-bubble time {
+  margin-left: auto;
+  font-size: 0.6rem;
+  opacity: 0.65;
+}
+
+.dm-bubble.is-mine {
+  border-bottom-right-radius: 0.35rem;
+  background: linear-gradient(90deg, #ff2d78, #ff6b2c);
+  color: #fff;
+}
+
+.dm-bubble.is-theirs {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-left-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dm-bubble.is-sending {
+  opacity: 0.6;
+}
+
+.dm-receipt {
+  margin-top: 0.2rem;
+  text-align: right;
+  color: var(--color-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.dm-retry {
+  display: flex;
+  margin: 0.2rem 0 0 auto;
+  align-items: center;
+  gap: 0.25rem;
+  color: #fca5a5;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.dm-typing {
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.dm-typing i {
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.6);
+  animation: dm-dot 1.2s infinite ease-in-out;
+}
+
+.dm-typing i:nth-child(2) { animation-delay: 0.15s; }
+.dm-typing i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dm-dot {
+  0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* ---------- lounge ---------- */
+
+.lounge {
+  height: calc(100svh - 170px);
+}
+
+@media (min-width: 768px) {
+  .lounge {
+    height: calc(100vh - 120px);
+  }
+}
+
+.lounge-online {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 9999px;
+  background: rgba(52, 211, 153, 0.12);
+  padding: 0.3rem 0.65rem;
+  color: #6ee7b7;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lounge-older {
+  display: flex;
+  margin: 0.4rem auto 0.8rem;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-line);
+  border-radius: 9999px;
+  padding: 0.35rem 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lounge-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.lounge-line.is-grouped {
+  margin-top: 0.15rem;
+}
+
+.lounge-line.is-mine {
+  justify-content: flex-end;
+}
+
+.lounge-line.is-mine .lounge-body {
+  align-items: flex-end;
+}
+
+.lounge-body {
+  display: flex;
+  min-width: 0;
+  max-width: 80%;
+  flex-direction: column;
+}
+
+.lounge-body .dm-bubble {
+  max-width: 100%;
+}
+
+.lounge-avatar {
+  display: grid;
+  height: 2rem;
+  width: 2rem;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #df3a6a, #6d2a8c);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.lounge-avatar img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.lounge-avatar.is-spacer {
+  background: none;
+}
+
+.lounge-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.2rem 0.3rem;
+  color: #ef789a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.lounge-name em {
+  border-radius: 0.25rem;
+  background: rgba(223, 58, 106, 0.18);
+  padding: 0 0.3rem;
+  color: #ef789a;
+  font-size: 0.58rem;
+  font-style: normal;
+}

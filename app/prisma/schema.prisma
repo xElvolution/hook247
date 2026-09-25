@@ -137,6 +137,7 @@ model User {
   coinWithdrawals    CoinWithdrawal[]
   liveSessions       LiveSession[]
   liveComments       LiveComment[]
+  loungeMessages     LoungeMessage[]
   payoutAccount      PayoutAccount?
 
   @@index([bannedAt])
@@ -241,6 +242,8 @@ model Message {
   senderId  String
   body      String
   createdAt DateTime @default(now())
+  /// When the recipient opened the conversation after this message arrived.
+  readAt    DateTime?
 
   match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
   sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
@@ -683,4 +686,19 @@ model LiveGift {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------- lounge
+
+/// Public group chat for signed-in members.
+model LoungeMessage {
+  id        String    @id @default(cuid())
+  userId    String
+  body      String
+  createdAt DateTime  @default(now())
+  hiddenAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }

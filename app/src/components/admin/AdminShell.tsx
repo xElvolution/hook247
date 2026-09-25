@@ -42,6 +42,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { href: "/502test/reports", label: "Reports", badgeKey: "reports" },
       { href: "/502test/content", label: "Content" },
       { href: "/502test/live", label: "Live" },
+      { href: "/502test/lounge", label: "Lounge" },
       { href: "/502test/audit", label: "Audit" },
     ],
   },
