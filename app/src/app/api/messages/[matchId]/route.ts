@@ -6,6 +6,7 @@ import { getActiveSessionUserId } from "@/lib/user";
 import { isMockUserId, mockSend, mockThread } from "@/lib/mock";
 import { emitRealtime } from "@/lib/realtime";
 import { failFrom } from "@/lib/http";
+import { canWrite, viewerState } from "@/lib/social";
 
 async function assertMember(matchId: string, userId: string) {
   const match = await db.match.findUnique({ where: { id: matchId } });
@@ -38,13 +39,20 @@ export async function GET(
       db.message.findMany({ where: { matchId }, orderBy: { createdAt: "desc" }, take: 200 }),
       db.profile.findUnique({ where: { userId: otherId } }),
     ]);
+    const state = viewerState(match, userId);
     if (read.count > 0) {
-      await emitRealtime({ userIds: [otherId] }, "dm:read", { matchId, readerId: userId, readAt: readAt.toISOString() });
+      // No read receipts on a request you have not accepted.
+      if (state !== "request_received" && state !== "declined_by_me") {
+        await emitRealtime({ userIds: [otherId] }, "dm:read", { matchId, readerId: userId, readAt: readAt.toISOString() });
+      }
       await emitRealtime({ userIds: [userId] }, "dm:seen", { matchId });
     }
 
     return NextResponse.json({
       me: userId,
+      status: match.status,
+      state,
+      canWrite: canWrite(match, userId),
       other: {
         userId: otherId,
         displayName: other?.displayName ?? "Member",
@@ -101,6 +109,16 @@ export async function POST(
     if (!other) {
       return NextResponse.json(
         { error: "This conversation is no longer available." },
+        { status: 403 }
+      );
+    }
+
+    if (!canWrite(match, userId)) {
+      return NextResponse.json(
+        {
+          error: match.status === "DECLINED" ? "This message request was declined." : "Accept the message request to reply.",
+          state: viewerState(match, userId),
+        },
         { status: 403 }
       );
     }

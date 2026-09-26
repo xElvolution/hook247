@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, RotateCcw, SendHorizontal } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Check, Inbox, Loader2, RotateCcw, SendHorizontal, X } from "lucide-react";
 import { getRealtime, useOnRealtimeConnect, useRealtimeEvent, useRealtimeStatus } from "@/lib/realtimeClient";
 
 type Msg = {
@@ -16,6 +16,7 @@ type Msg = {
 };
 type Other = { userId: string; displayName: string; avatarUrl: string; verified: boolean };
 type Presence = { userId: string; online: boolean; lastSeen: number | null };
+type ThreadState = "open" | "request_sent" | "request_received" | "declined_by_them" | "declined_by_me";
 
 function newClientId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}${Math.random()}`;
@@ -54,6 +55,8 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
   const [error, setError] = useState("");
   const [typing, setTyping] = useState(false);
   const [presence, setPresence] = useState<Presence | null>(null);
+  const [state, setState] = useState<ThreadState>("open");
+  const [responding, setResponding] = useState<"" | "accept" | "decline">("");
   const connected = useRealtimeStatus();
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<number | null>(null);
@@ -71,6 +74,7 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
       const data = await res.json();
       setOther(data.other);
       if (data.me) setMe(data.me);
+      if (data.state) setState(data.state);
       setMessages((current) => {
         const pending = current.filter((m) => m.status);
         return [...data.messages, ...pending];
@@ -141,6 +145,28 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
       }
     }
   );
+
+  useRealtimeEvent<{ matchId: string; status: string }>("dm:request", (data) => {
+    if (data.matchId === matchId) load();
+  });
+
+  async function respond(action: "accept" | "decline") {
+    setResponding(action);
+    setError("");
+    const res = await fetch(`/api/messages/${matchId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setResponding("");
+    if (!res?.ok) {
+      setError(data.error || "Could not update the request. Try again.");
+      return;
+    }
+    if (data.state) setState(data.state);
+    if (action === "accept") markRead();
+  }
 
   useRealtimeEvent<{ matchId: string; id: string }>("dm:retract", (data) => {
     if (data.matchId !== matchId) return;
@@ -217,7 +243,10 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 403) setError(data.error || "This conversation is closed.");
+        if (res.status === 403) {
+          setError(data.error || "This conversation is closed.");
+          if (data.state) setState(data.state);
+        }
         throw new Error();
       }
       setMessages((current) => {
@@ -285,7 +314,9 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
         {loading ? (
           <p className="mt-10 text-center text-sm text-muted">Loading messages...</p>
         ) : messages.length === 0 ? (
-          <p className="mt-10 text-center text-sm text-muted">You matched! Break the ice. Ask about their vibe.</p>
+          <p className="mt-10 text-center text-sm text-muted">
+            {state === "request_sent" ? "Say hello. Your first message arrives as a request." : "Say hello. Ask about their vibe."}
+          </p>
         ) : null}
         {messages.map((m, i) => {
           const prev = messages[i - 1];
@@ -322,6 +353,37 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
       </div>
 
       {error && <p className="mb-2 text-center text-xs text-red-300">{error}</p>}
+      {state === "request_received" || state === "declined_by_me" ? (
+        <div className="dm-request-card">
+          <Inbox className="h-5 w-5 shrink-0 text-[#ef789a]" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              {state === "request_received" ? `${other?.displayName ?? "This member"} wants to message you` : "You declined this request"}
+            </p>
+            <p className="text-xs text-muted">
+              {state === "request_received"
+                ? "They will not see that you read it unless you accept. Accept to reply, or decline to close the chat."
+                : "Accept it if you change your mind and want to reply."}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button type="button" className="btn-primary !px-4 !py-2 text-xs" onClick={() => respond("accept")} disabled={!!responding}>
+                {responding === "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Accept
+              </button>
+              {state === "request_received" ? (
+                <button type="button" className="btn-ghost !px-4 !py-2 text-xs" onClick={() => respond("decline")} disabled={!!responding}>
+                  {responding === "decline" ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Decline
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : state === "declined_by_them" ? (
+        <p className="dm-request-note">This message request was not accepted, so you cannot send more messages here.</p>
+      ) : (
+      <>
+      {state === "request_sent" ? (
+        <p className="dm-request-note">Message request sent. {other?.displayName ?? "They"} will see it in their Requests and can accept it to chat.</p>
+      ) : null}
       <form onSubmit={send} className="flex gap-2">
         <input
           className="input flex-1"
@@ -335,6 +397,8 @@ export default function ChatPage({ params }: { params: Promise<{ matchId: string
           <SendHorizontal className="h-5 w-5" />
         </button>
       </form>
+      </>
+      )}
     </div>
   );
 }

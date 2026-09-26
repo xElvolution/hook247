@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
-import { sendMatchEmail } from "@/lib/mailer";
+import { follow, SocialError, unfollow } from "@/lib/social";
 import { isMockUserId, mockSwipe } from "@/lib/mock";
 
 const schema = z.object({
@@ -36,48 +36,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Profile not available" }, { status: 404 });
   }
 
-  await db.swipe.upsert({
-    where: { swiperId_swipedId: { swiperId: userId, swipedId: targetUserId } },
-    create: { swiperId: userId, swipedId: targetUserId, liked },
-    update: { liked },
-  });
-
-  let match = null;
+  // A like is now a follow. Following each other opens a conversation.
   if (liked) {
-    const theyLikedMe = await db.swipe.findUnique({
-      where: { swiperId_swipedId: { swiperId: targetUserId, swipedId: userId } },
-    });
-    if (theyLikedMe?.liked) {
-      const [a, b] = [userId, targetUserId].sort();
-      const existing = await db.match.findUnique({
-        where: { userAId_userBId: { userAId: a, userBId: b } },
-      });
-      match = existing ?? (await db.match.create({ data: { userAId: a, userBId: b } }));
-
-      // Only on a brand-new match — re-swiping an existing one must not
-      // re-notify both people.
-      if (!existing) {
-        try {
-          const [mine, theirs] = await Promise.all([
-            db.profile.findUnique({ where: { userId }, include: { user: true } }),
-            db.profile.findUnique({
-              where: { userId: targetUserId },
-              include: { user: true },
-            }),
-          ]);
-          if (mine && theirs) {
-            await Promise.all([
-              sendMatchEmail(mine.user.email, theirs.displayName),
-              sendMatchEmail(theirs.user.email, mine.displayName),
-            ]);
-          }
-        } catch (err) {
-          // The match is already saved; a mail outage must not undo it.
-          console.error("Match email failed:", err);
-        }
-      }
+    try {
+      const result = await follow(userId, targetUserId);
+      return NextResponse.json({ ok: true, following: true, matched: result.newMatch, matchId: result.matchId });
+    } catch (err) {
+      if (err instanceof SocialError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
     }
   }
 
-  return NextResponse.json({ ok: true, matched: !!match, matchId: match?.id ?? null });
+  await db.swipe.upsert({
+    where: { swiperId_swipedId: { swiperId: userId, swipedId: targetUserId } },
+    create: { swiperId: userId, swipedId: targetUserId, liked: false },
+    update: { liked: false },
+  });
+  await unfollow(userId, targetUserId);
+  return NextResponse.json({ ok: true, following: false, matched: false, matchId: null });
 }

@@ -7,10 +7,11 @@ import { motion } from "framer-motion";
 import {
   BadgeCheck,
   Flame,
-  Heart,
   MapPin,
   Radio,
   SlidersHorizontal,
+  UserCheck,
+  UserPlus,
   Users,
 } from "lucide-react";
 
@@ -38,7 +39,6 @@ const FILTERS = [
 ] as const;
 
 function ProfileCard({
-  guest,
   liked,
   profile,
   onLike,
@@ -108,10 +108,11 @@ function ProfileCard({
             className="btn-ghost !px-3 !py-2 text-xs"
             data-liked={liked}
             onClick={() => onLike(profile)}
-            aria-label={`${liked ? "Unlike" : "Like"} ${profile.displayName}`}
+            aria-label={`${liked ? "Unfollow" : "Follow"} ${profile.displayName}`}
+            aria-pressed={liked}
           >
-            <Heart className={`h-3.5 w-3.5 ${liked ? "fill-[#df3a6a] text-[#df3a6a]" : ""}`} />
-            {liked ? "Liked" : guest ? "Like" : "Connect"}
+            {liked ? <UserCheck className="h-3.5 w-3.5 text-[#df3a6a]" /> : <UserPlus className="h-3.5 w-3.5" />}
+            {liked ? "Following" : "Follow"}
           </button>
         </div>
       </div>
@@ -160,11 +161,20 @@ export default function SwipeDeck() {
       else next.add(profile.userId);
       return next;
     });
-    await fetch("/api/swipe", {
-      method: "POST",
+    const res = await fetch("/api/follow", {
+      method: wasLiked ? "DELETE" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetUserId: profile.userId, liked: !wasLiked }),
-    });
+      body: JSON.stringify({ userId: profile.userId }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      // Put the button back the way it was.
+      setLiked((current) => {
+        const next = new Set(current);
+        if (wasLiked) next.add(profile.userId);
+        else next.delete(profile.userId);
+        return next;
+      });
+    }
   }
 
   return (

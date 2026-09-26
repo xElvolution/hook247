@@ -142,6 +142,8 @@ model User {
   earningsWallet     EarningsWallet?
   earningsTransactions EarningsTransaction[]
   withdrawalAccounts WithdrawalAccount[]
+  following          Follow[]            @relation("follower")
+  followers          Follow[]            @relation("following")
 
   /// Admin switch: the account can neither send nor receive gifts and tips.
   giftingDisabled Boolean @default(false)
@@ -231,17 +233,45 @@ model Swipe {
   @@index([swipedId, liked])
 }
 
+/// ACCEPTED conversations show in both inboxes. A PENDING one is a message
+/// request from `requestedById` to someone who does not follow them: it waits
+/// in the recipient's Requests tab until they accept or decline it.
+enum MatchStatus {
+  ACCEPTED
+  PENDING
+  DECLINED
+}
+
 model Match {
-  id        String   @id @default(cuid())
-  userAId   String
-  userBId   String
-  createdAt DateTime @default(now())
+  id            String      @id @default(cuid())
+  userAId       String
+  userBId       String
+  createdAt     DateTime    @default(now())
+  status        MatchStatus @default(ACCEPTED)
+  requestedById String?
+  respondedAt   DateTime?
 
   userA    User      @relation("userA", fields: [userAId], references: [id], onDelete: Cascade)
   userB    User      @relation("userB", fields: [userBId], references: [id], onDelete: Cascade)
   messages Message[]
 
   @@unique([userAId, userBId])
+}
+
+/// One member following another. `seenAt` stays null until the person being
+/// followed opens their followers list, which drives the new follower badge.
+model Follow {
+  id          String    @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime  @default(now())
+  seenAt      DateTime?
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId, createdAt])
 }
 
 model Message {

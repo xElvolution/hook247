@@ -4,6 +4,7 @@ import { getSessionUserId } from "@/lib/session";
 import { ageFrom } from "@/lib/user";
 import { isMockUserId, mockMatches } from "@/lib/mock";
 import { failFrom } from "@/lib/http";
+import { viewerState } from "@/lib/social";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -12,7 +13,11 @@ export async function GET() {
 
   try {
     const matches = await db.match.findMany({
-      where: { OR: [{ userAId: userId }, { userBId: userId }] },
+      where: {
+        OR: [{ userAId: userId }, { userBId: userId }],
+        // Requests you declined disappear from your inbox.
+        NOT: { status: "DECLINED", requestedById: { not: userId } },
+      },
       include: {
         userA: { include: { profile: true } },
         userB: { include: { profile: true } },
@@ -46,6 +51,9 @@ export async function GET() {
           : null,
         unread: unreadBy.get(m.id) ?? 0,
         matchedAt: m.createdAt,
+        status: m.status,
+        requestedById: m.requestedById,
+        state: viewerState(m, userId),
       };
     });
     items.sort((a, b) => {

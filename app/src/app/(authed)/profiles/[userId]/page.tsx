@@ -11,6 +11,7 @@ import {
   MapPin,
   Radio,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import PublicProfileActions from "@/components/PublicProfileActions";
 import PublicProfileSections from "@/components/PublicProfileSections";
@@ -101,6 +102,18 @@ export default async function PublicProfilePage({
   if (!profile) notFound();
 
   const sessionUserId = await getSessionUserId();
+  const realMember = sessionUserId && !isMockUserId(sessionUserId) && !isMockUserId(profile.userId);
+  const [followerCount, following] = isMockUserId(profile.userId)
+    ? [0, false]
+    : await Promise.all([
+        db.follow.count({ where: { followingId: profile.userId, follower: { bannedAt: null } } }).catch(() => 0),
+        realMember && sessionUserId !== profile.userId
+          ? db.follow
+              .findUnique({ where: { followerId_followingId: { followerId: sessionUserId, followingId: profile.userId } }, select: { id: true } })
+              .then((row) => !!row)
+              .catch(() => false)
+          : Promise.resolve(false),
+      ]);
   const gallery = Array.from(
     new Set([profile.avatarUrl, ...profile.photos, ...profile.clips].filter(Boolean))
   );
@@ -187,6 +200,10 @@ export default async function PublicProfilePage({
               <Eye className="h-4 w-4 text-[#df3a6a]" />
               <span><small>Views</small><strong>{new Intl.NumberFormat("en-NG").format(profile.profileViews)}</strong></span>
             </div>
+            <div className="public-profile-fact">
+              <Users className="h-4 w-4 text-[#df3a6a]" />
+              <span><small>Followers</small><strong>{new Intl.NumberFormat("en-NG").format(followerCount)}</strong></span>
+            </div>
           </div>
         </div>
 
@@ -203,6 +220,7 @@ export default async function PublicProfilePage({
             profileName={profile.displayName}
             userId={profile.userId}
             tippable={profile.role === "ESCORT"}
+            following={following}
             whatsapp={profile.whatsapp}
             country={profile.country}
           />

@@ -50,7 +50,14 @@ const matchCache = new Map(); // matchId -> { a, b, banned, at }
 async function loadMatch(matchId) {
   const match = await db.match.findUnique({
     where: { id: matchId },
-    select: { userAId: true, userBId: true, userA: { select: { bannedAt: true } }, userB: { select: { bannedAt: true } } },
+    select: {
+      userAId: true,
+      userBId: true,
+      status: true,
+      requestedById: true,
+      userA: { select: { bannedAt: true } },
+      userB: { select: { bannedAt: true } },
+    },
   });
   if (!match) {
     matchCache.delete(matchId);
@@ -60,6 +67,8 @@ async function loadMatch(matchId) {
     a: match.userAId,
     b: match.userBId,
     banned: new Set([match.userA.bannedAt ? match.userAId : null, match.userB.bannedAt ? match.userBId : null].filter(Boolean)),
+    status: match.status,
+    requestedById: match.requestedById,
     at: Date.now(),
   };
   matchCache.set(matchId, entry);
@@ -80,6 +89,18 @@ async function matchMembers(matchId) {
     return hit;
   }
   return loadMatch(matchId);
+}
+
+// A message request only lets the person who sent it write until it is
+// accepted; a declined one is closed. Anything short of ACCEPTED is re-read
+// from the database, because accepting happens outside this process.
+async function sendableMembers(matchId, userId) {
+  let members = await matchMembers(matchId);
+  if (members && members.status !== "ACCEPTED") members = await loadMatch(matchId);
+  if (!members) return { members: null, allowed: false };
+  if (members.status === "ACCEPTED") return { members, allowed: true };
+  if (members.status === "PENDING") return { members, allowed: members.requestedById === userId };
+  return { members, allowed: false };
 }
 
 function otherMember(members, userId) {
@@ -218,10 +239,16 @@ io.on("connection", (socket) => {
       const body = typeof data?.body === "string" ? data.body.trim().slice(0, 2000) : "";
       const clientId = typeof data?.clientId === "string" ? data.clientId.slice(0, 64) : undefined;
       if (!body) return reply({ ok: false, error: "Write a message first" });
-      const members = await matchMembers(data?.matchId);
+      const { members, allowed } = await sendableMembers(data?.matchId, userId);
       const other = otherMember(members, userId);
       if (!other) return reply({ ok: false, error: "Conversation not found" });
       if (members.banned.has(other)) return reply({ ok: false, error: "This conversation is no longer available." });
+      if (!allowed) {
+        return reply({
+          ok: false,
+          error: members.status === "DECLINED" ? "This message request was declined." : "Accept the message request to reply.",
+        });
+      }
 
       const message = { id: crypto.randomUUID(), body, senderId: userId, at: new Date().toISOString(), readAt: null };
       const payload = { matchId: data.matchId, clientId, message };
@@ -281,9 +308,9 @@ io.on("connection", (socket) => {
 
   socket.on("dm:typing", async (data) => {
     if (!allowTyping()) return;
-    const members = await matchMembers(data?.matchId).catch(() => null);
+    const { members, allowed } = await sendableMembers(data?.matchId, userId).catch(() => ({ members: null, allowed: false }));
     const other = otherMember(members, userId);
-    if (!other) return;
+    if (!other || !allowed) return;
     io.to(`user:${other}`).emit("dm:typing", { matchId: data.matchId, userId, typing: Boolean(data.typing) });
   });
 
@@ -296,7 +323,9 @@ io.on("connection", (socket) => {
     const result = await db.message
       .updateMany({ where: { matchId: data.matchId, senderId: other, readAt: null }, data: { readAt } })
       .catch(() => ({ count: 0 }));
-    if (result.count > 0) {
+    // No read receipts on a request the reader has not accepted yet.
+    const pendingForMe = members.status === "PENDING" && members.requestedById !== userId;
+    if (result.count > 0 && !pendingForMe) {
       io.to(`user:${other}`).emit("dm:read", { matchId: data.matchId, readerId: userId, readAt: readAt.toISOString() });
     }
     // Let this user's other tabs clear their unread badge too.

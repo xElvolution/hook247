@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { HeartHandshake, BadgeCheck, CheckCheck, Check, MessagesSquare } from "lucide-react";
+import { HeartHandshake, BadgeCheck, CheckCheck, Check, Compass, Inbox } from "lucide-react";
 import { useRealtimeEvent, useRealtimeStatus } from "@/lib/realtimeClient";
 
 type MatchItem = {
@@ -16,6 +16,8 @@ type MatchItem = {
   lastMessage: { body: string; mine: boolean; at: string; readAt?: string | null } | null;
   unread?: number;
   matchedAt: string;
+  status?: "ACCEPTED" | "PENDING" | "DECLINED";
+  state?: "open" | "request_sent" | "request_received" | "declined_by_them" | "declined_by_me";
 };
 
 type Incoming = { matchId: string; message: { id: string; body: string; senderId: string; at: string; readAt: string | null } };
@@ -49,6 +51,7 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
   const [guest, setGuest] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [tab, setTab] = useState<"conversations" | "requests">("conversations");
   const connected = useRealtimeStatus();
 
   const load = useCallback(async () => {
@@ -97,6 +100,9 @@ export default function MatchesPage() {
       return [updated, ...list.slice(0, idx), ...list.slice(idx + 1)];
     });
   });
+  useRealtimeEvent<{ matchId: string; status: string }>("dm:request", () => {
+    load();
+  });
   useRealtimeEvent<{ matchId: string }>("dm:seen", ({ matchId }) => {
     setMatches((list) => list.map((m) => (m.matchId === matchId ? { ...m, unread: 0 } : m)));
   });
@@ -106,15 +112,30 @@ export default function MatchesPage() {
     );
   });
 
-  const fresh = matches.filter((m) => !m.lastMessage);
-  const threads = matches.filter((m) => m.lastMessage);
+  const requests = matches.filter((m) => m.state === "request_received");
+  const inbox = matches.filter((m) => m.state !== "request_received");
+  const fresh = inbox.filter((m) => !m.lastMessage);
+  const threads = tab === "requests" ? requests : inbox.filter((m) => m.lastMessage);
+  const requestsUnread = requests.reduce((n, m) => n + (m.unread ?? 0), 0);
 
   return (
     <div className="mx-auto max-w-xl">
       <div className="mb-5 flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">Messages</h1>
-        <Link href="/lounge" className="dm-lounge-link"><MessagesSquare className="h-4 w-4" /> Lounge</Link>
+        <Link href="/" className="dm-lounge-link"><Compass className="h-4 w-4" /> Discover Profiles</Link>
       </div>
+
+      {!guest && !loading ? (
+        <div className="pulse-tabs mb-4" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === "conversations"} data-active={tab === "conversations"} onClick={() => setTab("conversations")}>
+            Conversations
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "requests"} data-active={tab === "requests"} onClick={() => setTab("requests")}>
+            Requests{requests.length ? ` (${requests.length})` : ""}
+            {requestsUnread > 0 && tab !== "requests" ? <span className="dm-tab-dot" aria-label="Unread requests" /> : null}
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="space-y-2" aria-label="Loading conversations">
@@ -132,18 +153,24 @@ export default function MatchesPage() {
           <p className="font-display font-bold">Could not load your messages</p>
           <button type="button" onClick={() => { setLoading(true); load(); }} className="btn-primary mt-5 text-sm">Try again</button>
         </div>
-      ) : matches.length === 0 ? (
+      ) : tab === "requests" && requests.length === 0 ? (
+        <div className="glass flex flex-col items-center rounded-3xl p-10 text-center">
+          <Inbox className="h-10 w-10 text-[#ff5d52]" strokeWidth={1.5} />
+          <p className="font-display mt-4 font-bold">No message requests</p>
+          <p className="mt-2 text-sm text-muted">When someone you do not follow messages you, it waits here until you accept it.</p>
+        </div>
+      ) : tab === "conversations" && inbox.length === 0 ? (
         <div className="glass flex flex-col items-center rounded-3xl p-10 text-center">
           <HeartHandshake className="h-10 w-10 text-[#ff5d52]" strokeWidth={1.5} />
-          <p className="font-display mt-4 font-bold">No matches yet</p>
-          <p className="mt-2 text-sm text-muted">When you and someone both like each other, you can chat here.</p>
-          <Link href="/discover" className="btn-primary mt-6 text-sm">Go discover</Link>
+          <p className="font-display mt-4 font-bold">No conversations yet</p>
+          <p className="mt-2 text-sm text-muted">Follow profiles you like and message them from their profile. When you follow each other, the chat opens here.</p>
+          <Link href="/" className="btn-primary mt-6 text-sm">Discover Profiles</Link>
         </div>
       ) : (
         <>
-          {fresh.length > 0 && (
+          {tab === "conversations" && fresh.length > 0 && (
             <section className="mb-6">
-              <p className="dm-section-label">New matches</p>
+              <p className="dm-section-label">New connections</p>
               <div className="dm-new-rail">
                 {fresh.map((m) => (
                   <Link key={m.matchId} href={`/matches/${m.matchId}`} className="dm-new-item">
@@ -157,7 +184,7 @@ export default function MatchesPage() {
 
           {threads.length > 0 && (
             <section>
-              <p className="dm-section-label">Conversations</p>
+              <p className="dm-section-label">{tab === "requests" ? "Waiting for your answer" : "Conversations"}</p>
               <div className="space-y-1">
                 {threads.map((m) => {
                   const unread = m.unread ?? 0;
@@ -169,6 +196,8 @@ export default function MatchesPage() {
                         <p className="flex items-center gap-1.5 font-semibold">
                           <span className="truncate">{m.displayName}{m.age ? `, ${m.age}` : ""}</span>
                           {m.verified && <BadgeCheck className="h-4 w-4 shrink-0 fill-sky-500 text-white" />}
+                          {m.state === "request_sent" ? <span className="dm-tag">Pending</span> : null}
+                          {m.state === "declined_by_them" ? <span className="dm-tag" data-tone="muted">Not accepted</span> : null}
                           <time className="ml-auto shrink-0 text-[11px] font-medium text-muted">{when(last.at)}</time>
                         </p>
                         <p className="dm-preview">
