@@ -35,8 +35,8 @@ const PRIMARY_MENU: { label: string; href: string; icon: LucideIcon }[] = [
 function bottomMenu(authed: boolean): { label: string; href: string; icon: LucideIcon }[] {
   return [
     ...PRIMARY_MENU.filter((item) => item.href !== "/lounge"),
-    { label: authed ? "Profile" : "Get hooked", href: authed ? "/profile" : "/signup", icon: User },
     { label: "Messages", href: authed ? "/matches" : "/login?next=/matches", icon: MessageCircle },
+    { label: authed ? "Profile" : "Get hooked", href: authed ? "/profile" : "/signup", icon: User },
   ];
 }
 
