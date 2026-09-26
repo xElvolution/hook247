@@ -154,6 +154,20 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
 
   return (
     <div className="mx-auto max-w-6xl">
+      {!profile.verified ? (
+        <div className="verify-banner mb-5">
+          <div>
+            <p className="verify-banner-kicker">No verified badge yet</p>
+            <p className="verify-banner-copy">
+              Get verified so clients can trust this profile. The badge shows on your photos, cards, and public page.
+            </p>
+          </div>
+          <Link href="/premium" className="btn-primary shrink-0 text-sm">
+            <BadgeCheck className="h-4 w-4" /> Get verified
+          </Link>
+        </div>
+      ) : null}
+
       <div className="section-heading-row mb-6 items-end">
         <div>
           <p className="section-kicker">Account</p>
