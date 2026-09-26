@@ -18,6 +18,8 @@ import {
   Newspaper,
   Radio,
   User,
+  UserPlus,
+  Users,
   X,
   Zap,
   type LucideIcon,
@@ -34,13 +36,14 @@ function bottomMenu(authed: boolean): { label: string; href: string; icon: Lucid
   return [
     ...PRIMARY_MENU.filter((item) => item.href !== "/lounge"),
     { label: authed ? "Profile" : "Get hooked", href: authed ? "/profile" : "/signup", icon: User },
-    { label: "Boost", href: "/premium", icon: Zap },
+    { label: "Messages", href: authed ? "/matches" : "/login?next=/matches", icon: MessageCircle },
   ];
 }
 
 const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "My profile", href: "/profile", icon: User },
   { label: "Messages", href: "/matches", icon: MessageCircle },
+  { label: "Followers", href: "/followers", icon: Users },
   { label: "Wallet", href: "/coins", icon: Coins },
   { label: "Referrals", href: "/referrals", icon: Gift },
   { label: "Premium", href: "/premium", icon: Zap },
@@ -48,7 +51,7 @@ const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Contact", href: "/contact", icon: Mail },
 ];
 
-const MEMBER_ONLY = new Set(["/profile", "/matches"]);
+const MEMBER_ONLY = new Set(["/profile", "/matches", "/followers"]);
 
 /** Unread direct messages, kept fresh by the realtime socket. */
 function useUnreadMessages(authed: boolean) {
@@ -78,6 +81,12 @@ function useUnreadMessages(authed: boolean) {
       .catch(() => undefined);
     void message;
   });
+  useRealtimeEvent("dm:request", () => {
+    fetch("/api/messages/unread", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCount(d.total ?? 0))
+      .catch(() => undefined);
+  });
   useRealtimeEvent("dm:seen", () => {
     fetch("/api/messages/unread", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -85,6 +94,37 @@ function useUnreadMessages(authed: boolean) {
       .catch(() => undefined);
   });
   return authed ? count : 0;
+}
+
+type FollowEvent = { followerId: string; name: string; avatarUrl: string };
+
+/** New followers since the member last opened their followers list, plus a toast for live follows. */
+function useFollowers(authed: boolean) {
+  const [count, setCount] = useState(0);
+  const [toast, setToast] = useState<FollowEvent | null>(null);
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!authed) return;
+    let alive = true;
+    fetch("/api/followers/unseen", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d) => alive && setCount(d.count ?? 0))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [authed, pathname]);
+  useRealtimeEvent<FollowEvent>("follow:new", (event) => {
+    if (!authed) return;
+    if (window.location.pathname !== "/followers") setCount((c) => c + 1);
+    setToast(event);
+  });
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+  return { count: authed ? count : 0, toast, dismiss: () => setToast(null) };
 }
 
 function Brand() {
@@ -101,14 +141,19 @@ function Brand() {
 
 export default function Shell({
   authed,
+  avatarUrl = "",
   children,
 }: {
   authed: boolean;
+  avatarUrl?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const unread = useUnreadMessages(authed);
+  const followers = useFollowers(authed);
+  const badgeFor = (href: string) => (href === "/matches" ? unread : href === "/followers" ? followers.count : 0);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -129,7 +174,7 @@ export default function Shell({
             >
               <item.icon className="h-[18px] w-[18px]" strokeWidth={2.1} />
               <span>{item.label}</span>
-              {item.href === "/matches" && unread > 0 ? <b className="nav-unread">{unread > 99 ? "99+" : unread}</b> : null}
+              {badgeFor(item.href) > 0 ? <b className="nav-unread">{badgeFor(item.href) > 99 ? "99+" : badgeFor(item.href)}</b> : null}
             </Link>
           );
         })}
@@ -157,15 +202,18 @@ export default function Shell({
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             <NavSearch />
             {authed ? (
-              <Link href="/matches" className="icon-button header-dm-button" aria-label={unread ? `Messages, ${unread} unread` : "Messages"}>
-                <MessageCircle className="h-5 w-5" />
-                {unread > 0 ? <b className="nav-unread is-dot">{unread > 9 ? "9+" : unread}</b> : null}
+              <Link href="/premium" className="icon-button header-boost-button" aria-label="Boost your profile" title="Boost">
+                <Zap className="h-5 w-5" />
               </Link>
             ) : null}
             {authed ? (
-              <Link href="/profile" className="header-auth-btn btn-ghost">
-                <User className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Profile</span>
+              <Link href="/profile" className="header-profile-btn" aria-label="My profile">
+                {avatarUrl && !avatarBroken ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" onError={() => setAvatarBroken(true)} />
+                ) : (
+                  <User className="h-4 w-4" />
+                )}
               </Link>
             ) : (
               <>
@@ -266,10 +314,37 @@ export default function Shell({
             >
               <item.icon className="h-5 w-5" strokeWidth={2.1} />
               <span>{item.label}</span>
+              {item.href === "/matches" && unread > 0 ? (
+                <b className="nav-unread is-dot mobile-bottom-badge">{unread > 9 ? "9+" : unread}</b>
+              ) : null}
             </Link>
           );
         })}
       </nav>
+
+      <AnimatePresence>
+        {followers.toast ? (
+          <motion.div
+            key={followers.toast.followerId}
+            className="follow-toast"
+            role="status"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+          >
+            <Link href="/followers" onClick={followers.dismiss}>
+              {followers.toast.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={followers.toast.avatarUrl} alt="" />
+              ) : (
+                <span className="follow-toast-icon"><UserPlus className="h-4 w-4" /></span>
+              )}
+              <span><strong>{followers.toast.name}</strong> started following you</span>
+            </Link>
+            <button type="button" onClick={followers.dismiss} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
     </div>
   );

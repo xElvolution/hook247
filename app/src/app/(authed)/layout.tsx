@@ -16,5 +16,9 @@ export default async function AppLayout({
   // Signed-in users must finish onboarding; guests may browse everything.
   if (user && !user.profile) redirect("/onboarding");
 
-  return <Shell authed={!!user?.profile}>{children}</Shell>;
+  return (
+    <Shell authed={!!user?.profile} avatarUrl={user?.profile?.avatarUrl ?? ""}>
+      {children}
+    </Shell>
+  );
 }

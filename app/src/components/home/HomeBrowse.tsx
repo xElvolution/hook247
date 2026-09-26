@@ -80,11 +80,6 @@ function MemberCard({ member }: { member: Card }) {
             </span>
           )}
         </div>
-        {member.startingRate ? (
-          <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-            from ₦{new Intl.NumberFormat("en-NG").format(member.startingRate)}
-          </span>
-        ) : null}
       </div>
 
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/90 to-transparent" />
