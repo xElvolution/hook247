@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Prisma, type CoinTxType } from "@prisma/client";
 import { db } from "./db";
 
@@ -13,23 +12,31 @@ import { db } from "./db";
 export class CoinError extends Error {
   constructor(
     message: string,
-    public code: "INSUFFICIENT" | "INVALID" | "NOT_ALLOWED" | "NOT_FOUND" | "STATE" | "CHANGED"
+    public code: "INSUFFICIENT" | "INVALID" | "NOT_ALLOWED" | "NOT_FOUND" | "STATE" | "CHANGED" | "NOT_ELIGIBLE"
   ) {
     super(message);
   }
 }
 
 /** The transaction client handed to interactive transactions on our extended client. */
-type Tx = Omit<typeof db, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
+export type Tx = Omit<typeof db, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
-const TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 } as const;
+export const TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 } as const;
 
+/** One coin always costs the buyer this much, whatever the pack. */
+export const COIN_PRICE_KOBO = 5_000;
+
+/** Coins v2 catalogue. No bulk discount: every pack is coins x N50. */
 export const DEFAULT_PACKS = [
-  { name: "Starter", coins: 100, priceKobo: 150_000, sortOrder: 1 },
-  { name: "Popular", coins: 500, priceKobo: 700_000, sortOrder: 2 },
-  { name: "Big spender", coins: 1_000, priceKobo: 1_350_000, sortOrder: 3 },
-  { name: "Best value", coins: 5_000, priceKobo: 6_500_000, sortOrder: 4 },
-];
+  { name: "Starter", coins: 20 },
+  { name: "Bronze", coins: 50 },
+  { name: "Silver", coins: 100 },
+  { name: "Gold", coins: 250 },
+  { name: "Platinum", coins: 500 },
+  { name: "Diamond", coins: 1_000 },
+  { name: "Royal", coins: 1_500 },
+  { name: "VIP", coins: 2_000 },
+].map((pack, i) => ({ ...pack, priceKobo: pack.coins * COIN_PRICE_KOBO, sortOrder: i + 1 }));
 
 export async function getCoinSettings() {
   return db.coinSettings.upsert({ where: { id: "default" }, create: { id: "default" }, update: {} });
@@ -41,9 +48,20 @@ export async function ensureCoinCatalog() {
   if (count === 0) await db.coinPack.createMany({ data: DEFAULT_PACKS });
 }
 
+/** The fixed coin price. Stored in settings for the audit trail, but never allowed to drift from N50. */
+export function coinPrice(settings: { coinPriceKobo: number }) {
+  return settings.coinPriceKobo > 0 ? settings.coinPriceKobo : COIN_PRICE_KOBO;
+}
+
+/** Active packs, priced from the coin price rather than whatever is stored on the row. */
 export async function activePacks() {
   await ensureCoinCatalog();
-  return db.coinPack.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { coins: "asc" }] });
+  const [packs, settings] = await Promise.all([
+    db.coinPack.findMany({ where: { active: true }, orderBy: [{ sortOrder: "asc" }, { coins: "asc" }] }),
+    getCoinSettings(),
+  ]);
+  const price = coinPrice(settings);
+  return packs.map((pack) => ({ ...pack, priceKobo: pack.coins * price }));
 }
 
 export async function getWallet(userId: string) {
@@ -51,7 +69,7 @@ export async function getWallet(userId: string) {
   return { balance: wallet?.balance ?? 0, held: wallet?.held ?? 0, lifetimeEarned: wallet?.lifetimeEarned ?? 0 };
 }
 
-async function lockWallets(tx: Tx, userIds: string[]) {
+export async function lockWallets(tx: Tx, userIds: string[]) {
   const ids = [...new Set(userIds)].sort();
   await tx.$executeRaw`
     INSERT INTO "CoinWallet" ("userId", "balance", "held", "lifetimeEarned", "updatedAt")
@@ -63,7 +81,7 @@ async function lockWallets(tx: Tx, userIds: string[]) {
     SELECT "userId" FROM "CoinWallet" WHERE "userId" = ANY(${ids}::text[]) ORDER BY "userId" FOR UPDATE`;
 }
 
-type Change = {
+export type CoinChange = {
   userId: string;
   type: CoinTxType;
   /** Signed change to the spendable balance. */
@@ -83,7 +101,7 @@ type Change = {
   note?: string;
 };
 
-async function apply(tx: Tx, change: Change) {
+export async function applyCoinChange(tx: Tx, change: CoinChange) {
   const held = change.held ?? 0;
   const earned = change.earned ?? 0;
   const rows = await tx.$queryRaw<{ balance: number }[]>`
@@ -116,7 +134,7 @@ async function apply(tx: Tx, change: Change) {
   });
 }
 
-function isUniqueViolation(err: unknown) {
+export function isUniqueViolation(err: unknown) {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
 }
 
@@ -125,9 +143,9 @@ function isUniqueViolation(err: unknown) {
  * key was already used, nothing happens and the earlier result is reported.
  */
 async function move<T>(
-  changes: Change[],
+  changes: CoinChange[],
   extra?: (tx: Tx) => Promise<T>
-): Promise<{ duplicate: boolean; entries: Awaited<ReturnType<typeof apply>>[]; extra?: T }> {
+): Promise<{ duplicate: boolean; entries: Awaited<ReturnType<typeof applyCoinChange>>[]; extra?: T }> {
   const key = changes[0]?.idempotencyKey;
   if (key) {
     const existing = await db.coinTransaction.findUnique({ where: { idempotencyKey: key } });
@@ -137,7 +155,7 @@ async function move<T>(
     return await db.$transaction(async (tx) => {
       await lockWallets(tx, changes.map((c) => c.userId));
       const entries = [];
-      for (const change of changes) entries.push(await apply(tx, change));
+      for (const change of changes) entries.push(await applyCoinChange(tx, change));
       const result = extra ? await extra(tx) : undefined;
       return { duplicate: false, entries, extra: result };
     }, TX_OPTIONS);
@@ -195,148 +213,23 @@ export async function creditPurchase(reference: string, verifiedAmountKobo: numb
   return { credited: !result.duplicate, already: result.duplicate, coins: purchase.coins };
 }
 
-// ---------------------------------------------------------------- tipping
+// ---------------------------------------------------------------- legacy payouts
 
-export const MAX_TIP = 100_000;
-
-export async function sendTip(input: {
-  fromId: string;
-  toId: string;
-  coins: number;
-  nonce: string;
-  source: "profile" | "post" | "live";
-  postId?: string | null;
-  liveSessionId?: string | null;
-  giftId?: string | null;
-  note?: string;
-}) {
-  const coins = Math.floor(input.coins);
-  if (!Number.isFinite(coins) || coins < 1 || coins > MAX_TIP) {
-    throw new CoinError(`Tips are between 1 and ${MAX_TIP.toLocaleString("en-NG")} coins`, "INVALID");
-  }
-  if (input.fromId === input.toId) throw new CoinError("You cannot tip yourself", "NOT_ALLOWED");
-
-  const recipient = await db.user.findUnique({
-    where: { id: input.toId },
-    select: { bannedAt: true, profile: { select: { role: true, displayName: true } } },
-  });
-  if (!recipient || recipient.bannedAt || !recipient.profile) {
-    throw new CoinError("This member cannot receive tips right now", "NOT_FOUND");
-  }
-  if (recipient.profile.role !== "ESCORT") {
-    throw new CoinError("Only escort profiles can receive tips", "NOT_ALLOWED");
-  }
-
-  const key = `tip:${input.fromId}:${input.nonce}`;
-  const shared = {
-    postId: input.postId ?? null,
-    liveSessionId: input.liveSessionId ?? null,
-    giftId: input.giftId ?? null,
-    source: input.source,
-    note: input.note ?? "",
-  };
-  const result = await move([
-    { ...shared, userId: input.fromId, type: "TIP_SENT", amount: -coins, idempotencyKey: key, counterpartyId: input.toId },
-    { ...shared, userId: input.toId, type: "TIP_RECEIVED", amount: coins, earned: coins, idempotencyKey: `${key}:in`, counterpartyId: input.fromId },
-  ]);
-  const sent = result.entries[0];
-  return {
-    duplicate: result.duplicate,
-    coins,
-    balance: sent?.balanceAfter ?? (await getWallet(input.fromId)).balance,
-    recipientName: recipient.profile.displayName,
-  };
-}
-
-// ---------------------------------------------------------------- withdrawals
-
-/**
- * Check a withdrawal amount and work out what it pays. Shared by the quote
- * shown in the confirm step and the request itself, so the figure the escort
- * confirms is computed exactly the way the stored payout is.
+/*
+ * Coins v1 let escorts cash out coins directly. v2 pays out of the naira
+ * earnings wallet instead (see earnings.ts), but a v1 request that is still
+ * open has to be settled the way it was made: by releasing or refunding the
+ * coins it holds. These two only ever touch requests with source "coins".
  */
-async function checkWithdrawal(userId: string, requested: number) {
-  const coins = Math.floor(requested);
-  const settings = await getCoinSettings();
-  if (!Number.isFinite(coins) || coins < settings.minWithdrawalCoins) {
-    throw new CoinError(`The minimum withdrawal is ${settings.minWithdrawalCoins.toLocaleString("en-NG")} coins`, "INVALID");
-  }
-  const profile = await db.profile.findUnique({ where: { userId }, select: { role: true } });
-  if (profile?.role !== "ESCORT") throw new CoinError("Withdrawals are for escort accounts", "NOT_ALLOWED");
 
-  const open = await db.coinWithdrawal.count({
-    where: { userId, status: { in: ["REQUESTED", "APPROVED"] } },
-  });
-  if (open > 0) throw new CoinError("You already have a withdrawal being processed", "STATE");
-
-  const wallet = await getWallet(userId);
-  if (coins > wallet.balance) {
-    throw new CoinError(`You only have ${wallet.balance.toLocaleString("en-NG")} coins available`, "INSUFFICIENT");
-  }
-  return { coins, amountKobo: coins * settings.payoutKoboPerCoin, balance: wallet.balance };
-}
-
-/** What a withdrawal of `coins` would pay right now. Nothing is moved. */
-export async function quoteWithdrawal(userId: string, coins: number) {
-  const { amountKobo, balance, coins: whole } = await checkWithdrawal(userId, coins);
-  return { coins: whole, amountKobo, balance };
-}
-
-export async function requestWithdrawal(input: {
-  userId: string;
-  coins: number;
-  bankCode: string;
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
-  /** The amount the escort confirmed. If the rate changed since the quote, the request is refused. */
-  expectedAmountKobo?: number;
-}) {
-  const { coins, amountKobo } = await checkWithdrawal(input.userId, input.coins);
-  if (input.expectedAmountKobo !== undefined && input.expectedAmountKobo !== amountKobo) {
-    throw new CoinError("The payout amount has changed. Review the new amount and confirm again.", "CHANGED");
-  }
-  const withdrawalId = randomUUID();
-  const result = await move(
-    [
-      {
-        userId: input.userId,
-        type: "WITHDRAWAL_REQUEST",
-        amount: -coins,
-        held: coins,
-        withdrawalId,
-        idempotencyKey: `withdrawal-request:${withdrawalId}`,
-        source: "withdrawal",
-        note: `${coins} coins to ${input.bankName} ${input.accountNumber.slice(-4).padStart(input.accountNumber.length, "*")}`,
-      },
-    ],
-    async (tx) => {
-      const withdrawal = await tx.coinWithdrawal.create({
-        data: {
-          id: withdrawalId,
-          userId: input.userId,
-          coins,
-          amountKobo,
-          bankCode: input.bankCode,
-          bankName: input.bankName,
-          accountNumber: input.accountNumber,
-          accountName: input.accountName,
-        },
-      });
-      return withdrawal;
-    }
-  );
-  const withdrawal = result.extra!;
-  return { withdrawal, balance: result.entries[0].balanceAfter };
-}
-
-/** Admin: the payout was sent. Releases the held coins for good. */
-export async function markWithdrawalPaid(withdrawalId: string, payoutReference: string, note: string) {
+/** Admin: a v1 coin payout was sent. Releases the held coins for good. */
+export async function legacyMarkPaid(withdrawalId: string, payoutReference: string, note: string) {
   const w = await db.coinWithdrawal.findUnique({ where: { id: withdrawalId } });
   if (!w) throw new CoinError("Withdrawal not found", "NOT_FOUND");
+  if (w.source !== "coins") throw new CoinError("Not a coin withdrawal", "STATE");
   if (w.status === "PAID") return w;
   if (w.status === "REJECTED") throw new CoinError("This withdrawal was rejected", "STATE");
-  const result = await move(
+  return move(
     [
       {
         userId: w.userId,
@@ -358,13 +251,13 @@ export async function markWithdrawalPaid(withdrawalId: string, payoutReference: 
       return updated.count;
     }
   );
-  return result;
 }
 
-/** Admin: refuse the request and give the coins back. */
-export async function rejectWithdrawal(withdrawalId: string, note: string) {
+/** Admin: refuse a v1 coin payout and give the coins back. */
+export async function legacyReject(withdrawalId: string, note: string) {
   const w = await db.coinWithdrawal.findUnique({ where: { id: withdrawalId } });
   if (!w) throw new CoinError("Withdrawal not found", "NOT_FOUND");
+  if (w.source !== "coins") throw new CoinError("Not a coin withdrawal", "STATE");
   if (w.status === "REJECTED") return w;
   if (w.status === "PAID") throw new CoinError("This withdrawal was already paid", "STATE");
   return move(
@@ -400,8 +293,4 @@ export async function adminAdjust(userId: string, delta: number, note: string, k
   return move([
     { userId, type: "ADMIN_ADJUST", amount, idempotencyKey: key, source: "admin", note: note.slice(0, 300) },
   ]);
-}
-
-export function coinsToNaira(coins: number, koboPerCoin: number) {
-  return `₦${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format((coins * koboPerCoin) / 100)}`;
 }

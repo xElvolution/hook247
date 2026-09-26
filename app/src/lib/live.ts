@@ -8,6 +8,7 @@ import {
 } from "livekit-server-sdk";
 import { db } from "./db";
 import { VISIBLE_PROFILE } from "./moderation";
+import { hasActivePaidPlan } from "./eligibility";
 import { ageFrom } from "./user";
 
 export class LiveError extends Error {
@@ -17,12 +18,19 @@ export class LiveError extends Error {
 }
 
 export const DEFAULT_GIFTS = [
-  { name: "Rose", emoji: "🌹", coins: 1, sortOrder: 1 },
-  { name: "Heart", emoji: "💖", coins: 10, sortOrder: 2 },
-  { name: "Fire", emoji: "🔥", coins: 50, sortOrder: 3 },
-  { name: "Diamond", emoji: "💎", coins: 200, sortOrder: 4 },
-  { name: "Crown", emoji: "👑", coins: 1000, sortOrder: 5 },
-];
+  { name: "Rose", emoji: "🌹", coins: 1, animation: "float" },
+  { name: "Kiss", emoji: "💋", coins: 5, animation: "float" },
+  { name: "Heart", emoji: "💖", coins: 10, animation: "pulse" },
+  { name: "Love", emoji: "💕", coins: 20, animation: "pulse" },
+  { name: "Diamond", emoji: "💎", coins: 50, animation: "burst" },
+  { name: "Crown", emoji: "👑", coins: 100, animation: "burst" },
+  { name: "VIP Gift", emoji: "🥂", coins: 500, animation: "spotlight" },
+  { name: "Luxury Gift", emoji: "🏎️", coins: 1_000, animation: "spotlight" },
+  { name: "Royal Gift", emoji: "🏰", coins: 2_000, animation: "royal" },
+].map((gift, i) => ({ ...gift, sortOrder: i + 1 }));
+
+/** Overlay effects a gift can use, from lightest to grandest. */
+export const GIFT_ANIMATIONS = ["float", "pulse", "burst", "spotlight", "royal"] as const;
 
 /** How long a host may be disconnected before the live is closed. */
 const HOST_GRACE_MS = 90_000;
@@ -66,9 +74,9 @@ export async function ensureGifts() {
 export async function activeGifts() {
   await ensureGifts();
   return db.liveGift.findMany({
-    where: { active: true },
+    where: { active: true, deletedAt: null },
     orderBy: [{ sortOrder: "asc" }, { coins: "asc" }],
-    select: { id: true, name: true, emoji: true, coins: true },
+    select: { id: true, name: true, emoji: true, coins: true, animation: true },
   });
 }
 
@@ -76,7 +84,18 @@ export async function activeGifts() {
 
 export type LiveEvent =
   | { t: "comment"; id: string; userId: string; name: string; avatarUrl: string; body: string; at: string }
-  | { t: "gift"; id: string; userId: string; name: string; giftId: string; giftName: string; emoji: string; coins: number; at: string }
+  | {
+      t: "gift";
+      id: string;
+      userId: string;
+      name: string;
+      giftId: string;
+      giftName: string;
+      emoji: string;
+      coins: number;
+      animation?: string;
+      at: string;
+    }
   | { t: "ended"; at: string };
 
 export async function broadcast(roomName: string, event: LiveEvent) {
@@ -126,6 +145,8 @@ const hostSelect = {
   verified: true,
   role: true,
   adminHidden: true,
+  plan: true,
+  subscriptionExpiresAt: true,
 } as const;
 
 export async function getActiveSessionForHost(hostId: string) {
@@ -143,6 +164,9 @@ export async function startLive(hostId: string, rawTitle: string) {
   if (!user || user.bannedAt || !user.profile) throw new LiveError("Your account cannot go live right now", 403);
   if (user.profile.role !== "ESCORT") throw new LiveError("Going live is available to escort accounts", 403);
   if (user.profile.adminHidden) throw new LiveError("Your profile is under review, so you cannot go live yet", 403);
+  if (!hasActivePaidPlan(user.profile)) {
+    throw new LiveError("Going live needs an active paid plan. Renew your plan to go live.", 403);
+  }
 
   const previous = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`live:${hostId}`}))`;
@@ -208,22 +232,23 @@ export async function joinToken(sessionId: string, userId: string) {
 export async function liveSummary(sessionId: string) {
   const session = await db.liveSession.findUnique({ where: { id: sessionId } });
   if (!session) throw new LiveError("Live not found", 404);
+  const giftWhere = { kind: "GIFT" as const, liveSessionId: sessionId, receiverId: session.hostId };
   const [earned, supporters, comments] = await Promise.all([
-    db.coinTransaction.aggregate({
-      where: { liveSessionId: sessionId, userId: session.hostId, type: "TIP_RECEIVED" },
-      _sum: { amount: true },
+    db.ledgerEntry.aggregate({
+      where: giftWhere,
+      _sum: { coins: true, escortShareKobo: true },
       _count: true,
     }),
-    db.coinTransaction.groupBy({
-      by: ["counterpartyId"],
-      where: { liveSessionId: sessionId, userId: session.hostId, type: "TIP_RECEIVED" },
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: "desc" } },
+    db.ledgerEntry.groupBy({
+      by: ["senderId"],
+      where: giftWhere,
+      _sum: { coins: true },
+      orderBy: { _sum: { coins: "desc" } },
       take: 5,
     }),
     db.liveComment.count({ where: { sessionId } }),
   ]);
-  const ids = supporters.map((s) => s.counterpartyId).filter((id): id is string => !!id);
+  const ids = supporters.map((s) => s.senderId).filter((id): id is string => !!id);
   const profiles = ids.length
     ? await db.profile.findMany({ where: { userId: { in: ids } }, select: { userId: true, displayName: true, avatarUrl: true } })
     : [];
@@ -237,14 +262,15 @@ export async function liveSummary(sessionId: string) {
     endedAt: session.endedAt?.toISOString() ?? null,
     durationSeconds: Math.max(0, Math.round((end.getTime() - session.startedAt.getTime()) / 1000)),
     peakViewers: session.peakViewers,
-    coinsEarned: earned._sum.amount ?? 0,
+    coinsEarned: earned._sum.coins ?? 0,
+    earnedKobo: earned._sum.escortShareKobo ?? 0,
     gifts: earned._count,
     comments,
     topSupporters: supporters.map((s) => ({
-      userId: s.counterpartyId ?? "",
-      displayName: byId.get(s.counterpartyId ?? "")?.displayName ?? "Member",
-      avatarUrl: byId.get(s.counterpartyId ?? "")?.avatarUrl ?? "",
-      coins: s._sum.amount ?? 0,
+      userId: s.senderId ?? "",
+      displayName: byId.get(s.senderId ?? "")?.displayName ?? "Member",
+      avatarUrl: byId.get(s.senderId ?? "")?.avatarUrl ?? "",
+      coins: s._sum.coins ?? 0,
     })),
   };
 }

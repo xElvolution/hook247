@@ -3,9 +3,11 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
 import { isMockUserId } from "@/lib/mock";
-import { CoinError, sendTip } from "@/lib/coins";
+import { CoinError } from "@/lib/coins";
+import { sendGift } from "@/lib/earnings";
 import { VISIBLE_POST } from "@/lib/moderation";
 import { failFrom } from "@/lib/http";
+import { coinErrorResponse } from "@/lib/coinHttp";
 
 const schema = z.object({
   toUserId: z.string().min(1),
@@ -15,7 +17,7 @@ const schema = z.object({
   postId: z.string().optional(),
 });
 
-/** Send coins to an escort from their profile or one of their posts. */
+/** Send coins to an escort from their profile or one of their posts. Split like any gift. */
 export async function POST(req: Request) {
   const userId = await getActiveSessionUserId();
   if (!userId) return NextResponse.json({ error: "Sign in to send a tip" }, { status: 401 });
@@ -30,13 +32,16 @@ export async function POST(req: Request) {
       const post = await db.post.findFirst({ where: { AND: [{ id: postId ?? "" }, VISIBLE_POST] }, select: { authorId: true } });
       if (!post || post.authorId !== toUserId) return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
-    const result = await sendTip({ fromId: userId, toId: toUserId, coins, nonce, source, postId: postId ?? null });
-    return NextResponse.json({ ok: true, ...result });
+    const result = await sendGift({ fromId: userId, toId: toUserId, coins, nonce: `tip:${nonce}`, source, postId: postId ?? null });
+    return NextResponse.json({
+      ok: true,
+      duplicate: result.duplicate,
+      coins: result.coins,
+      balance: result.balance,
+      recipientName: result.recipientName,
+    });
   } catch (err) {
-    if (err instanceof CoinError) {
-      const status = err.code === "INSUFFICIENT" ? 402 : err.code === "NOT_FOUND" ? 404 : 400;
-      return NextResponse.json({ error: err.message, code: err.code }, { status });
-    }
+    if (err instanceof CoinError) return coinErrorResponse(err);
     return failFrom(err);
   }
 }
