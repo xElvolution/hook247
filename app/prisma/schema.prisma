@@ -139,6 +139,14 @@ model User {
   liveComments       LiveComment[]
   loungeMessages     LoungeMessage[]
   payoutAccount      PayoutAccount?
+  earningsWallet     EarningsWallet?
+  earningsTransactions EarningsTransaction[]
+  withdrawalAccounts WithdrawalAccount[]
+
+  /// Admin switch: the account can neither send nor receive gifts and tips.
+  giftingDisabled Boolean @default(false)
+  /// Admin switch: withdrawals are refused and pending ones cannot be approved.
+  payoutsFrozen   Boolean @default(false)
 
   @@index([bannedAt])
   @@index([createdAt])
@@ -519,6 +527,8 @@ enum CoinTxType {
   WITHDRAWAL_PAID
   WITHDRAWAL_REFUND
   ADMIN_ADJUST
+  GIFT_SENT
+  LEGACY_CONVERSION
 }
 
 /// Cached coin balance. `balance` is spendable; `held` is coins locked in a
@@ -562,6 +572,8 @@ model CoinTransaction {
   @@index([liveSessionId])
 }
 
+/// A coin package. `priceKobo` is always coins x the fixed coin price; the
+/// checkout recomputes it rather than trusting the stored figure.
 model CoinPack {
   id        String   @id @default(cuid())
   name      String
@@ -593,19 +605,42 @@ model CoinPurchase {
 
 model CoinSettings {
   id                       String   @id @default("default")
-  /// What one coin pays out to an escort, in kobo (750 = N7.50).
+  /// Legacy (v1): what one coin paid out to an escort, in kobo. Kept because
+  /// escort coin balances were converted to naira earnings at this rate.
   payoutKoboPerCoin        Int      @default(750)
+  /// Legacy (v1) minimum withdrawal in coins. Unused since earnings are naira.
   minWithdrawalCoins       Int      @default(1000)
   /// Only switch on once Paystack Transfers are enabled on the account.
   paystackTransfersEnabled Boolean  @default(false)
+  /// What one coin costs the buyer, in kobo. Fixed at N50.
+  coinPriceKobo            Int      @default(5000)
+  /// Escort share of every gift, in percent. The platform keeps the rest.
+  escortSharePct           Int      @default(70)
+  /// Withdrawal fee in basis points (200 = 2%).
+  withdrawalFeeBps         Int      @default(200)
+  /// When on, every withdrawal waits for an admin to approve it.
+  manualWithdrawalApproval Boolean  @default(true)
+  /// Set once escort coin balances were converted to naira earnings.
+  legacyConvertedAt        DateTime?
   updatedAt                DateTime @updatedAt
 }
 
+/// A cash out request. v2 requests draw on the naira earnings wallet
+/// (`source` = "earnings"): `grossKobo` leaves the wallet, `feeKobo` is the
+/// withdrawal fee and `amountKobo` is what is sent to the bank. Legacy v1
+/// requests (`source` = "coins") held coins and paid `amountKobo`.
 model CoinWithdrawal {
   id              String           @id @default(cuid())
   userId          String
   coins           Int
+  /// Payout sent to the bank account, in kobo.
   amountKobo      Int
+  source          String           @default("coins")
+  grossKobo       Int              @default(0)
+  feeKobo         Int              @default(0)
+  feeBps          Int              @default(0)
+  accountId       String?
+  approvedAt      DateTime?
   status          WithdrawalStatus @default(REQUESTED)
   bankCode        String
   bankName        String
@@ -684,6 +719,10 @@ model LiveGift {
   coins     Int
   sortOrder Int      @default(0)
   active    Boolean  @default(true)
+  /// Overlay effect: float, pulse, burst, spotlight or royal.
+  animation String   @default("float")
+  /// Soft delete for gifts that already appear in the ledger.
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -701,4 +740,123 @@ model LoungeMessage {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------- earnings (v2)
+
+/// An escort's naira earnings from gifts. `balanceKobo` is withdrawable,
+/// `heldKobo` is locked in a pending withdrawal. Only ever changed together
+/// with an EarningsTransaction row, inside one database transaction.
+model EarningsWallet {
+  userId       String   @id
+  balanceKobo  Int      @default(0)
+  heldKobo     Int      @default(0)
+  lifetimeKobo Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+enum EarningsTxType {
+  GIFT_SHARE
+  LEGACY_CONVERSION
+  WITHDRAWAL_HOLD
+  WITHDRAWAL_PAID
+  WITHDRAWAL_RELEASE
+  ADMIN_ADJUST
+}
+
+/// Append-only naira ledger for escort earnings (a trigger refuses updates).
+model EarningsTransaction {
+  id               String         @id @default(cuid())
+  userId           String
+  type             EarningsTxType
+  /// Signed change to the withdrawable balance, in kobo.
+  amountKobo       Int
+  /// Signed change to the held balance, in kobo.
+  heldKobo         Int            @default(0)
+  balanceAfterKobo Int
+  idempotencyKey   String         @unique
+  ledgerEntryId    String?
+  withdrawalId     String?
+  note             String         @default("")
+  createdAt        DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}
+
+enum LedgerKind {
+  GIFT
+  PURCHASE
+  WITHDRAWAL_REQUEST
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_PAID
+  WITHDRAWAL_REJECTED
+  LEGACY_CONVERSION
+  ADMIN_ADJUST
+}
+
+enum LedgerStatus {
+  COMPLETED
+  PENDING
+  FAILED
+  REVERSED
+}
+
+/// Platform transaction ledger: one row per money event (gift, purchase,
+/// withdrawal step). Gift rows carry the full split. Append-only.
+model LedgerEntry {
+  id                String       @id @default(cuid())
+  kind              LedgerKind
+  status            LedgerStatus @default(COMPLETED)
+  idempotencyKey    String       @unique
+  senderId          String?
+  receiverId        String?
+  giftId            String?
+  giftName          String       @default("")
+  giftEmoji         String       @default("")
+  coins             Int          @default(0)
+  coinPriceKobo     Int          @default(0)
+  /// Gross value in kobo (gift value, purchase amount, withdrawal amount).
+  amountKobo        Int          @default(0)
+  escortSharePct    Int          @default(0)
+  escortShareKobo   Int          @default(0)
+  platformShareKobo Int          @default(0)
+  feeKobo           Int          @default(0)
+  payoutKobo        Int          @default(0)
+  liveSessionId     String?
+  postId            String?
+  purchaseId        String?
+  withdrawalId      String?
+  source            String       @default("")
+  note              String       @default("")
+  createdAt         DateTime     @default(now())
+
+  @@index([kind, createdAt])
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+  @@index([liveSessionId])
+  @@index([withdrawalId])
+}
+
+/// Saved bank accounts an escort can withdraw to.
+model WithdrawalAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  bankCode      String
+  bankName      String
+  accountNumber String
+  accountName   String
+  recipientCode String   @default("")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bankCode, accountNumber])
+  @@index([userId])
 }
