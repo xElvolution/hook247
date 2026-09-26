@@ -10,11 +10,6 @@ import { approveWithdrawal, markPayoutPaid, rejectPayout, runLegacyConversion } 
 import { payWithdrawalViaPaystack } from "@/lib/coinPayouts";
 import { fulfilCoinPurchase } from "@/lib/coinPurchases";
 
-function nairaToKobo(value: FormDataEntryValue | null) {
-  const n = Number(String(value ?? "").replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
-}
-
 function back(path: string, message: string, tone: "ok" | "error" = "ok"): never {
   const sep = path.includes("?") ? "&" : "?";
   redirect(`${path}${sep}${tone}=${encodeURIComponent(message)}`);

@@ -447,7 +447,9 @@ function WithdrawalHistory({ withdrawals }: { withdrawals: Withdrawal[] }) {
 
 function WithdrawPanel({ data, reload, onManageAccounts }: { data: EscortData; reload: () => Promise<void>; onManageAccounts: () => void }) {
   const accounts = data.accounts;
-  const [accountId, setAccountId] = useState(accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
+  const [picked, setPicked] = useState("");
+  // Fall back to the default account if the one picked was removed.
+  const accountId = accounts.some((a) => a.id === picked) ? picked : accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "";
   const [amount, setAmount] = useState("");
   const [quoting, setQuoting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -456,10 +458,6 @@ function WithdrawPanel({ data, reload, onManageAccounts }: { data: EscortData; r
   const [modalNotice, setModalNotice] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
-
-  useEffect(() => {
-    if (!accounts.some((a) => a.id === accountId)) setAccountId(accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
-  }, [accounts, accountId]);
 
   const open = data.withdrawals.find((w) => w.status === "REQUESTED" || w.status === "APPROVED");
   const account = accounts.find((a) => a.id === accountId);
@@ -556,7 +554,7 @@ function WithdrawPanel({ data, reload, onManageAccounts }: { data: EscortData; r
         <form onSubmit={review} className="mt-4 space-y-3">
           <label className="coin-field">
             <span>Send to</span>
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <select value={accountId} onChange={(e) => setPicked(e.target.value)}>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.accountName} · {a.bankName} {masked(a.accountNumber)}{a.isDefault ? " (default)" : ""}
@@ -612,21 +610,16 @@ function WithdrawPanel({ data, reload, onManageAccounts }: { data: EscortData; r
   );
 }
 
-function AccountsPanel({ initial, reload }: { initial: Account[]; reload: () => Promise<void> }) {
-  const [accounts, setAccounts] = useState(initial);
+function AccountsPanel({ initial: accounts, reload }: { initial: Account[]; reload: () => Promise<void> }) {
   const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
   const [bankError, setBankError] = useState("");
-  const [adding, setAdding] = useState(initial.length === 0);
+  const [adding, setAdding] = useState(accounts.length === 0);
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [resolving, setResolving] = useState(false);
-  const [resolveError, setResolveError] = useState("");
+  const [resolved, setResolved] = useState<{ key: string; name: string; error: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => setAccounts(initial), [initial]);
 
   useEffect(() => {
     if (!adding || banks.length) return;
@@ -636,30 +629,32 @@ function AccountsPanel({ initial, reload }: { initial: Account[]; reload: () => 
       .catch(() => setBankError("Could not load banks."));
   }, [adding, banks.length]);
 
+  const lookupKey = /^\d{10}$/.test(accountNumber) && bankCode ? `${bankCode}:${accountNumber}` : "";
+  const current = resolved && resolved.key === lookupKey ? resolved : null;
+  const accountName = current?.name ?? "";
+  const resolveError = current?.error ?? "";
+  const resolving = !!lookupKey && !current;
+
   // Look up the account name as soon as a full account number and bank are set.
   useEffect(() => {
-    setAccountName("");
-    setResolveError("");
-    if (!/^\d{10}$/.test(accountNumber) || !bankCode) return;
+    if (!lookupKey) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      setResolving(true);
       const response = await fetch("/api/coins/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountNumber, bankCode }),
+        body: JSON.stringify({ accountNumber: lookupKey.split(":")[1], bankCode: lookupKey.split(":")[0] }),
       }).catch(() => null);
       const body = response ? await response.json().catch(() => ({})) : {};
       if (cancelled) return;
-      setResolving(false);
-      if (response?.ok && body.accountName) setAccountName(body.accountName);
-      else setResolveError(body.error ?? "We could not find that account.");
+      if (response?.ok && body.accountName) setResolved({ key: lookupKey, name: body.accountName, error: "" });
+      else setResolved({ key: lookupKey, name: "", error: body.error ?? "We could not find that account." });
     }, 350);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [accountNumber, bankCode]);
+  }, [lookupKey]);
 
   async function call(method: "POST" | "PATCH" | "DELETE", payload: object) {
     const response = await fetch("/api/coins/accounts", {
@@ -691,7 +686,6 @@ function AccountsPanel({ initial, reload }: { initial: Account[]; reload: () => 
     const { ok, body } = await call("PATCH", { accountId: id });
     setBusyId("");
     if (!ok) return setError(body.error ?? "Could not update that account.");
-    setAccounts(body.accounts);
     await reload();
   }
 
@@ -702,7 +696,6 @@ function AccountsPanel({ initial, reload }: { initial: Account[]; reload: () => 
     const { ok, body } = await call("DELETE", { accountId: id });
     setBusyId("");
     if (!ok) return setError(body.error ?? "Could not remove that account.");
-    setAccounts(body.accounts);
     await reload();
   }
 
