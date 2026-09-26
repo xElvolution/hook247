@@ -44,7 +44,7 @@ const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "My profile", href: "/profile", icon: User },
   { label: "Messages", href: "/matches", icon: MessageCircle },
   { label: "Followers", href: "/followers", icon: Users },
-  { label: "Wallet", href: "/coins", icon: Coins },
+  { label: "Coins", href: "/coins", icon: Coins },
   { label: "Referrals", href: "/referrals", icon: Gift },
   { label: "Premium", href: "/premium", icon: Zap },
   { label: "FAQs", href: "/faqs", icon: CircleHelp },
