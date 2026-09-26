@@ -41,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user uploads, backups and database dumps never belong in git
+/public/uploads/
+*.dump
+*.bundle
+*.bak
+*.tgz
