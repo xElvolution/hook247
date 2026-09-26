@@ -69,6 +69,28 @@ export async function suspendUser(formData: FormData) {
   revalidateUser(userId);
 }
 
+/** Stop (or allow again) gifts to and from this account. */
+export async function setGiftingDisabled(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const disabled = formData.get("disabled") === "1";
+  if (!userId) return;
+  await db.user.update({ where: { id: userId }, data: { giftingDisabled: disabled } });
+  await logAdminAction(disabled ? "user.gifting.disable" : "user.gifting.enable", "user", userId);
+  revalidateUser(userId);
+}
+
+/** Hold every withdrawal for this account until an admin lifts it. */
+export async function setPayoutsFrozen(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const frozen = formData.get("frozen") === "1";
+  if (!userId) return;
+  await db.user.update({ where: { id: userId }, data: { payoutsFrozen: frozen } });
+  await logAdminAction(frozen ? "user.payouts.freeze" : "user.payouts.unfreeze", "user", userId);
+  revalidateUser(userId);
+}
+
 export async function hidePost(formData: FormData) {
   await requireAdmin();
   const postId = String(formData.get("postId") ?? "");

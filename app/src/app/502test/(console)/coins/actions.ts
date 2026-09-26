@@ -5,13 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAdmin, logAdminAction } from "@/lib/adminSession";
-import {
-  adminAdjust,
-  CoinError,
-  getCoinSettings,
-  markWithdrawalPaid,
-  rejectWithdrawal,
-} from "@/lib/coins";
+import { adminAdjust, CoinError, coinPrice, getCoinSettings } from "@/lib/coins";
+import { approveWithdrawal, markPayoutPaid, rejectPayout, runLegacyConversion } from "@/lib/earnings";
 import { payWithdrawalViaPaystack } from "@/lib/coinPayouts";
 import { fulfilCoinPurchase } from "@/lib/coinPurchases";
 
@@ -27,41 +22,44 @@ function back(path: string, message: string, tone: "ok" | "error" = "ok"): never
 
 export async function saveCoinSettings(formData: FormData) {
   await requireAdmin();
-  const payoutKoboPerCoin = nairaToKobo(formData.get("payoutNaira"));
-  const minWithdrawalCoins = Math.floor(Number(formData.get("minWithdrawalCoins")));
+  const escortSharePct = Math.floor(Number(formData.get("escortSharePct")));
+  const feePct = Number(String(formData.get("feePct") ?? "").replace(/[^\d.]/g, ""));
+  const withdrawalFeeBps = Math.round(feePct * 100);
+  const manualWithdrawalApproval = formData.get("manualWithdrawalApproval") === "on";
   const paystackTransfersEnabled = formData.get("paystackTransfersEnabled") === "on";
-  if (!Number.isFinite(payoutKoboPerCoin) || payoutKoboPerCoin < 1 || payoutKoboPerCoin > 1_000_000) {
-    back("/502test/coins", "Payout rate must be a positive amount in naira", "error");
+  if (!Number.isFinite(escortSharePct) || escortSharePct < 1 || escortSharePct > 100) {
+    back("/502test/coins", "Escort share must be between 1% and 100%", "error");
   }
-  if (!Number.isFinite(minWithdrawalCoins) || minWithdrawalCoins < 1) {
-    back("/502test/coins", "Minimum withdrawal must be at least 1 coin", "error");
+  if (!Number.isFinite(withdrawalFeeBps) || withdrawalFeeBps < 0 || withdrawalFeeBps > 5_000) {
+    back("/502test/coins", "Withdrawal fee must be between 0% and 50%", "error");
   }
   await getCoinSettings();
   await db.coinSettings.update({
     where: { id: "default" },
-    data: { payoutKoboPerCoin, minWithdrawalCoins, paystackTransfersEnabled },
+    data: { escortSharePct, withdrawalFeeBps, manualWithdrawalApproval, paystackTransfersEnabled },
   });
   await logAdminAction(
     "coins.settings",
     "coins",
     "default",
-    `payout ${payoutKoboPerCoin}k/coin, min ${minWithdrawalCoins}, transfers ${paystackTransfersEnabled ? "on" : "off"}`
+    `split ${escortSharePct}/${100 - escortSharePct}, fee ${withdrawalFeeBps}bps, manual ${manualWithdrawalApproval ? "on" : "off"}, transfers ${paystackTransfersEnabled ? "on" : "off"}`
   );
   revalidatePath("/502test/coins");
   back("/502test/coins", "Coin settings saved");
 }
 
+/** Packs are priced by the fixed coin price, so only the coin count is edited. */
 export async function savePack(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim().slice(0, 40);
   const coins = Math.floor(Number(formData.get("coins")));
-  const priceKobo = nairaToKobo(formData.get("priceNaira"));
   const sortOrder = Math.floor(Number(formData.get("sortOrder") ?? 0)) || 0;
   const active = formData.get("active") === "on";
-  if (!name || !Number.isFinite(coins) || coins < 1 || !Number.isFinite(priceKobo) || priceKobo < 10_000) {
-    back("/502test/coins", "Packs need a name, at least 1 coin and a price of at least ₦100", "error");
+  if (!name || !Number.isFinite(coins) || coins < 1 || coins > 1_000_000) {
+    back("/502test/coins", "Packs need a name and between 1 and 1,000,000 coins", "error");
   }
+  const priceKobo = coins * coinPrice(await getCoinSettings());
   if (id) {
     await db.coinPack.update({ where: { id }, data: { name, coins, priceKobo, sortOrder, active } });
   } else {
@@ -70,6 +68,34 @@ export async function savePack(formData: FormData) {
   await logAdminAction(id ? "coins.pack.update" : "coins.pack.create", "coinPack", id || name, `${coins} coins for ${priceKobo}k, ${active ? "active" : "hidden"}`);
   revalidatePath("/502test/coins");
   back("/502test/coins", id ? "Pack updated" : "Pack added");
+}
+
+export async function deletePack(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const used = await db.coinPurchase.count({ where: { packId: id } });
+  if (used) {
+    await db.coinPack.update({ where: { id }, data: { active: false } });
+    await logAdminAction("coins.pack.hide", "coinPack", id, "has purchases, hidden instead of deleted");
+    revalidatePath("/502test/coins");
+    back("/502test/coins", "Pack has purchases, so it was hidden instead of deleted");
+  }
+  await db.coinPack.delete({ where: { id } });
+  await logAdminAction("coins.pack.delete", "coinPack", id, "");
+  revalidatePath("/502test/coins");
+  back("/502test/coins", "Pack deleted");
+}
+
+/** Converts escorts' leftover v1 coins into naira earnings. Needs the typed confirmation. */
+export async function convertLegacyCoins(formData: FormData) {
+  await requireAdmin();
+  if (String(formData.get("confirm") ?? "").trim() !== "CONVERT") {
+    back("/502test/coins", "Type CONVERT to confirm the conversion", "error");
+  }
+  const result = await runLegacyConversion();
+  await logAdminAction("coins.legacy.convert", "coins", "default", `${result.converted} escort wallets converted`);
+  revalidatePath("/502test/coins");
+  back("/502test/coins", `${result.converted} escort wallets converted to earnings`);
 }
 
 export async function adjustWallet(formData: FormData) {
@@ -98,7 +124,7 @@ export async function payoutMarkPaid(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (!reference) back("/502test/coin-payouts", "Enter the bank transfer reference", "error");
   try {
-    await markWithdrawalPaid(id, reference, note);
+    await markPayoutPaid(id, reference, note);
   } catch (err) {
     if (err instanceof CoinError) back("/502test/coin-payouts", err.message, "error");
     throw err;
@@ -114,14 +140,29 @@ export async function payoutReject(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (!note) back("/502test/coin-payouts", "Say why the withdrawal is rejected", "error");
   try {
-    await rejectWithdrawal(id, note);
+    await rejectPayout(id, note);
   } catch (err) {
     if (err instanceof CoinError) back("/502test/coin-payouts", err.message, "error");
     throw err;
   }
   await logAdminAction("coins.payout.reject", "coinWithdrawal", id, note);
   revalidatePath("/502test/coin-payouts");
-  back("/502test/coin-payouts", "Rejected and coins refunded");
+  back("/502test/coin-payouts", "Rejected and refunded to the member");
+}
+
+export async function payoutApprove(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 300);
+  try {
+    await approveWithdrawal(id, note);
+  } catch (err) {
+    if (err instanceof CoinError) back("/502test/coin-payouts", err.message, "error");
+    throw err;
+  }
+  await logAdminAction("coins.payout.approve", "coinWithdrawal", id, note);
+  revalidatePath("/502test/coin-payouts");
+  back("/502test/coin-payouts", "Approved. Send the money, then mark it paid with the reference.");
 }
 
 export async function payoutViaPaystack(formData: FormData) {

@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { ensureGifts, reconcileLives } from "@/lib/live";
+import { reconcileLives } from "@/lib/live";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
-import { forceEndLive, saveGift } from "./actions";
+import { forceEndLive } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const input = "rounded border border-line bg-bg px-2 py-1.5 text-sm outline-none focus:border-brand";
 
 function duration(from: Date, to: Date | null) {
   const mins = Math.max(0, Math.round(((to ?? new Date()).getTime() - from.getTime()) / 60000));
@@ -15,24 +14,25 @@ function duration(from: Date, to: Date | null) {
 
 export default async function LiveAdminPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const params = await searchParams;
-  await ensureGifts();
   await reconcileLives(true).catch(() => undefined);
-  const [gifts, sessions] = await Promise.all([
-    db.liveGift.findMany({ orderBy: [{ sortOrder: "asc" }, { coins: "asc" }] }),
+  const [sessions] = await Promise.all([
     db.liveSession.findMany({
       orderBy: { startedAt: "desc" },
       take: 40,
       include: { host: { select: { email: true, profile: { select: { displayName: true } } } }, _count: { select: { comments: true } } },
     }),
   ]);
-  const earned = sessions.length
-    ? await db.coinTransaction.groupBy({
-        by: ["liveSessionId"],
-        where: { liveSessionId: { in: sessions.map((s) => s.id) }, type: "TIP_RECEIVED" },
-        _sum: { amount: true },
-      })
-    : [];
-  const earnedBy = new Map(earned.map((e) => [e.liveSessionId, e._sum.amount ?? 0]));
+  const ids = sessions.map((s) => s.id);
+  // Gifts from before the earnings wallet were plain coin tips; count both.
+  const [legacy, gifted] = ids.length
+    ? await Promise.all([
+        db.coinTransaction.groupBy({ by: ["liveSessionId"], where: { liveSessionId: { in: ids }, type: "TIP_RECEIVED" }, _sum: { amount: true } }),
+        db.ledgerEntry.groupBy({ by: ["liveSessionId"], where: { liveSessionId: { in: ids }, kind: "GIFT" }, _sum: { coins: true } }),
+      ])
+    : [[], []];
+  const earnedBy = new Map<string | null, number>();
+  for (const e of legacy) earnedBy.set(e.liveSessionId, (earnedBy.get(e.liveSessionId) ?? 0) + (e._sum.amount ?? 0));
+  for (const e of gifted) earnedBy.set(e.liveSessionId, (earnedBy.get(e.liveSessionId) ?? 0) + (e._sum.coins ?? 0));
   const active = sessions.filter((s) => s.status === "LIVE");
 
   return (
@@ -82,29 +82,9 @@ export default async function LiveAdminPage({ searchParams }: { searchParams: Pr
         )}
       </Panel>
 
-      <Panel title="Gifts">
-        <div className="space-y-2">
-          {gifts.map((gift) => (
-            <form key={gift.id} action={saveGift} className="flex flex-wrap items-end gap-2 rounded-lg border border-line/70 p-2">
-              <input type="hidden" name="id" value={gift.id} />
-              <label className="text-xs text-muted">Emoji<input name="emoji" defaultValue={gift.emoji} className={`${input} mt-1 block w-16`} /></label>
-              <label className="text-xs text-muted">Name<input name="name" defaultValue={gift.name} className={`${input} mt-1 block w-32`} /></label>
-              <label className="text-xs text-muted">Coins<input name="coins" type="number" min={1} defaultValue={gift.coins} className={`${input} mt-1 block w-24`} /></label>
-              <label className="text-xs text-muted">Order<input name="sortOrder" type="number" defaultValue={gift.sortOrder} className={`${input} mt-1 block w-16`} /></label>
-              <label className="flex items-center gap-1.5 pb-2 text-xs"><input type="checkbox" name="active" defaultChecked={gift.active} /> Active</label>
-              <button type="submit" className="rounded border border-line px-2.5 py-1.5 text-xs font-semibold">Save</button>
-            </form>
-          ))}
-          <form action={saveGift} className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-line p-2">
-            <label className="text-xs text-muted">Emoji<input name="emoji" placeholder="🎁" className={`${input} mt-1 block w-16`} /></label>
-            <label className="text-xs text-muted">Name<input name="name" placeholder="New gift" className={`${input} mt-1 block w-32`} /></label>
-            <label className="text-xs text-muted">Coins<input name="coins" type="number" min={1} className={`${input} mt-1 block w-24`} /></label>
-            <label className="text-xs text-muted">Order<input name="sortOrder" type="number" defaultValue={gifts.length + 1} className={`${input} mt-1 block w-16`} /></label>
-            <label className="flex items-center gap-1.5 pb-2 text-xs"><input type="checkbox" name="active" defaultChecked /> Active</label>
-            <button type="submit" className="rounded border border-line px-2.5 py-1.5 text-xs font-semibold">Add gift</button>
-          </form>
-        </div>
-      </Panel>
+      <p className="text-sm text-muted">
+        The gift catalog now lives on its own page: <Link href="/502test/gifts" className="underline">Gifts</Link>.
+      </p>
     </div>
   );
 }

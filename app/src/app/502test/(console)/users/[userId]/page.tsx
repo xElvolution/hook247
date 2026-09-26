@@ -8,6 +8,8 @@ import {
   banUser,
   unbanUser,
   suspendUser,
+  setGiftingDisabled,
+  setPayoutsFrozen,
   setPlan,
   grantSubscription,
   grantBoost,
@@ -207,7 +209,24 @@ export default async function UserEditPage({
             <Row label="Reports against" value={String(user._count.reportsAgainst)} />
             {banned ? <Row label="Ban reason" value={user.banReason || "—"} /> : null}
             {suspended ? <Row label="Suspended until" value={when(user.suspendedUntil)} /> : null}
+            <Row label="Gifting" value={user.giftingDisabled ? "Disabled" : "Allowed"} />
+            <Row label="Withdrawals" value={user.payoutsFrozen ? "Frozen" : "Allowed"} />
           </dl>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <form action={setGiftingDisabled}>
+              <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="disabled" value={user.giftingDisabled ? "0" : "1"} />
+              <AdminBtn tone={user.giftingDisabled ? "good" : "warn"}>{user.giftingDisabled ? "Allow gifting" : "Disable gifting"}</AdminBtn>
+            </form>
+            <form action={setPayoutsFrozen}>
+              <input type="hidden" name="userId" value={user.id} />
+              <input type="hidden" name="frozen" value={user.payoutsFrozen ? "0" : "1"} />
+              <AdminBtn tone={user.payoutsFrozen ? "good" : "warn"}>{user.payoutsFrozen ? "Unfreeze withdrawals" : "Freeze withdrawals"}</AdminBtn>
+            </form>
+            <Link href={`/502test/transactions?user=${user.id}&kind=all`} className="rounded border border-line px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-ink">
+              Transactions
+            </Link>
+          </div>
           <div className="mt-4 space-y-2">
             {banned ? (
               <form action={unbanUser}>

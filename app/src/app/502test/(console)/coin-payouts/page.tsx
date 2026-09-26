@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { nairaFromKobo } from "@/lib/money";
 import { getCoinSettings } from "@/lib/coins";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
-import { payoutMarkPaid, payoutReject, payoutViaPaystack } from "../coins/actions";
+import { payoutApprove, payoutMarkPaid, payoutReject, payoutViaPaystack } from "../coins/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,9 @@ export default async function CoinPayoutsPage({
     getCoinSettings(),
     db.coinWithdrawal.findMany({
       where: status === "open" ? { status: { in: ["REQUESTED", "APPROVED"] } } : status === "all" ? {} : { status: status as "PAID" | "REJECTED" },
-      include: { user: { select: { email: true, profile: { select: { displayName: true } }, coinWallet: true } } },
+      include: {
+        user: { select: { email: true, payoutsFrozen: true, profile: { select: { displayName: true } }, coinWallet: true, earningsWallet: true } },
+      },
       orderBy: { createdAt: status === "open" ? "asc" : "desc" },
       take: 100,
     }),
@@ -29,10 +31,11 @@ export default async function CoinPayoutsPage({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-2xl font-bold">Coin payouts</h1>
+        <h1 className="font-display text-2xl font-bold">Earnings payouts</h1>
         <p className="mt-1 text-sm text-muted">
-          Escort withdrawals. Rate {nairaFromKobo(settings.payoutKoboPerCoin)} per coin, minimum {settings.minWithdrawalCoins} coins.{" "}
-          Paystack transfers are {settings.paystackTransfersEnabled ? "on" : "off"} (<Link href="/502test/coins" className="underline">settings</Link>).
+          Escort withdrawals from their Earnings Wallet. Fee {settings.withdrawalFeeBps / 100}%, no minimum. Manual approval is{" "}
+          {settings.manualWithdrawalApproval ? "on" : "off"} and Paystack transfers are {settings.paystackTransfersEnabled ? "on" : "off"}{" "}
+          (<Link href="/502test/coins" className="underline">settings</Link>).
         </p>
       </div>
       {params.error ? <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{params.error}</p> : null}
@@ -66,20 +69,39 @@ export default async function CoinPayoutsPage({
                   <strong>{w.user.profile?.displayName ?? w.user.email}</strong>
                   <span className="text-muted">{w.user.email}</span>
                   <Badge tone={w.status === "PAID" ? "good" : w.status === "REJECTED" ? "muted" : "warn"}>{w.status}</Badge>
+                  {w.source !== "earnings" ? <Badge>legacy coins</Badge> : null}
+                  {w.user.payoutsFrozen ? <Badge tone="bad">payouts frozen</Badge> : null}
                   <span className="text-xs text-muted">{w.createdAt.toLocaleString("en-NG")}</span>
                 </div>
                 <p className="mt-1.5">
-                  <strong>{nairaFromKobo(w.amountKobo)}</strong> for {w.coins.toLocaleString("en-NG")} coins to{" "}
+                  {w.source === "earnings" ? (
+                    <>
+                      Send <strong>{nairaFromKobo(w.amountKobo)}</strong> ({nairaFromKobo(w.grossKobo)} less {nairaFromKobo(w.feeKobo)} fee) to{" "}
+                    </>
+                  ) : (
+                    <>
+                      Send <strong>{nairaFromKobo(w.amountKobo)}</strong> for {w.coins.toLocaleString("en-NG")} coins to{" "}
+                    </>
+                  )}
                   <strong>{w.accountName}</strong> · {w.accountNumber} · {w.bankName}
                 </p>
                 <p className="mt-0.5 text-xs text-muted">
-                  Wallet now: {(w.user.coinWallet?.balance ?? 0).toLocaleString("en-NG")} spendable, {(w.user.coinWallet?.held ?? 0).toLocaleString("en-NG")} held ·{" "}
-                  <Link href={`/502test/coins?user=${w.userId}`} className="underline">ledger</Link>
+                  {w.source === "earnings"
+                    ? `Earnings now: ${nairaFromKobo(w.user.earningsWallet?.balanceKobo ?? 0)} available, ${nairaFromKobo(w.user.earningsWallet?.heldKobo ?? 0)} held`
+                    : `Wallet now: ${(w.user.coinWallet?.balance ?? 0).toLocaleString("en-NG")} coins spendable, ${(w.user.coinWallet?.held ?? 0).toLocaleString("en-NG")} held`}
+                  {w.approvedAt ? ` · approved ${w.approvedAt.toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}` : ""} ·{" "}
+                  <Link href={`/502test/transactions?user=${w.userId}`} className="underline">transactions</Link>
                   {w.payoutReference ? ` · ref ${w.payoutReference}` : ""}
                   {w.adminNote ? ` · ${w.adminNote}` : ""}
                 </p>
                 {w.status === "REQUESTED" || w.status === "APPROVED" ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {w.status === "REQUESTED" && w.source === "earnings" ? (
+                      <form action={payoutApprove} className="flex gap-1.5">
+                        <input type="hidden" name="id" value={w.id} />
+                        <button type="submit" className="rounded border border-amber-400/50 px-2.5 py-1 text-xs font-semibold text-amber-300">Approve</button>
+                      </form>
+                    ) : null}
                     <form action={payoutMarkPaid} className="flex flex-wrap gap-1.5">
                       <input type="hidden" name="id" value={w.id} />
                       <input name="reference" placeholder="Bank transfer reference" className={`${input} w-48`} />
@@ -89,9 +111,9 @@ export default async function CoinPayoutsPage({
                     <form action={payoutReject} className="flex gap-1.5">
                       <input type="hidden" name="id" value={w.id} />
                       <input name="note" placeholder="Reason" className={`${input} w-40`} />
-                      <button type="submit" className="rounded border border-red-500/40 px-2.5 py-1 text-xs font-semibold text-red-300">Reject + refund</button>
+                      <button type="submit" className="rounded border border-red-500/40 px-2.5 py-1 text-xs font-semibold text-red-300">Reject and refund</button>
                     </form>
-                    {settings.paystackTransfersEnabled && w.status === "REQUESTED" ? (
+                    {settings.paystackTransfersEnabled && !w.payoutReference ? (
                       <form action={payoutViaPaystack}>
                         <input type="hidden" name="id" value={w.id} />
                         <button type="submit" className="rounded border border-brand/50 px-2.5 py-1 text-xs font-semibold text-brand-2">Pay via Paystack</button>
