@@ -17,12 +17,25 @@ export type LiveGiftEvent = {
   giftName: string;
   emoji: string;
   coins: number;
+  animation?: string;
   at: string;
 };
 
 export type LiveEvent = LiveComment | LiveGiftEvent | { t: "ended"; at: string };
 
-export type Gift = { id: string; name: string; emoji: string; coins: number };
+export type Gift = { id: string; name: string; emoji: string; coins: number; animation?: string };
+
+/** Private to the host: their share of a gift, sent over the realtime socket. */
+export type LiveEarning = {
+  sessionId: string;
+  id: string;
+  shareKobo: number;
+  coins: number;
+  giftName: string;
+  emoji: string;
+  from: string;
+  at: string;
+};
 
 export type LiveState = {
   id: string;
@@ -41,6 +54,7 @@ export type LiveSummary = {
   durationSeconds: number;
   peakViewers: number;
   coinsEarned: number;
+  earnedKobo: number;
   gifts: number;
   comments: number;
   topSupporters: { userId: string; displayName: string; avatarUrl: string; coins: number }[];

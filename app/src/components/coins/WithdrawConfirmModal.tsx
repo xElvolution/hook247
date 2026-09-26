@@ -3,15 +3,15 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Banknote, Landmark, Loader2, ShieldCheck } from "lucide-react";
-import { coinCount, naira } from "./format";
+import { naira } from "./format";
 import "./withdraw-confirm.css";
 
-export type WithdrawQuote = { coins: number; amountKobo: number };
+export type WithdrawQuote = { grossKobo: number; feeKobo: number; payoutKobo: number; feeBps: number };
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Confirm step for a coin withdrawal. The naira figure comes from the server quote. */
+/** Confirm step for an earnings withdrawal. Every figure comes from the server quote. */
 export default function WithdrawConfirmModal({
   quote,
   bankName,
@@ -100,11 +100,13 @@ export default function WithdrawConfirmModal({
         <span className="withdraw-confirm-icon" aria-hidden="true"><Banknote className="h-6 w-6" /></span>
         <p className="withdraw-confirm-kicker">Confirm withdrawal</p>
         <h2 id="withdraw-confirm-title" className="font-display">
-          You&apos;ll receive <span className="text-gradient">{naira(quote.amountKobo)}</span>
+          You&apos;ll receive <span className="text-gradient">{naira(quote.payoutKobo)}</span>
         </h2>
-        <p id="withdraw-confirm-desc" className="withdraw-confirm-sub">
-          for {coinCount(quote.coins)} coins
-        </p>
+        <dl id="withdraw-confirm-desc" className="withdraw-confirm-breakdown">
+          <div><dt>Withdrawal amount</dt><dd>{naira(quote.grossKobo)}</dd></div>
+          <div><dt>Fee ({(quote.feeBps / 100).toLocaleString("en-NG", { maximumFractionDigits: 2 })}%)</dt><dd>{quote.feeKobo ? `-${naira(quote.feeKobo)}` : naira(0)}</dd></div>
+          <div data-total="true"><dt>Final amount</dt><dd>{naira(quote.payoutKobo)}</dd></div>
+        </dl>
 
         {accountName || bankName ? (
           <div className="withdraw-confirm-account">
@@ -118,7 +120,7 @@ export default function WithdrawConfirmModal({
 
         <p className="withdraw-confirm-note">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          <span>Payouts are reviewed by our team before they are sent. Your coins are held until then and returned if the payout is declined.</span>
+          <span>Payouts are checked by our team before they are sent. The amount is held from your Earnings Wallet until then and returned in full if the payout is declined.</span>
         </p>
 
         {notice ? <p className="withdraw-confirm-flash" data-tone="info" role="status">{notice}</p> : null}

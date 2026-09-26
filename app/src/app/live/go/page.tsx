@@ -6,11 +6,22 @@ import GoLiveStudio from "@/components/live/GoLiveStudio";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
 import { getActiveSessionForHost, liveConfigured } from "@/lib/live";
+import { hasActivePaidPlan } from "@/lib/eligibility";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Go live | Hooks247" };
 
-function Notice({ title, body, avatarUrl }: { title: string; body: string; avatarUrl?: string }) {
+function Notice({
+  title,
+  body,
+  avatarUrl,
+  action,
+}: {
+  title: string;
+  body: string;
+  avatarUrl?: string;
+  action?: { href: string; label: string };
+}) {
   return (
     <main className="stream-room">
       {avatarUrl ? (
@@ -24,8 +35,17 @@ function Notice({ title, body, avatarUrl }: { title: string; body: string; avata
         <h1>{title}</h1>
         <p className="text-sm text-muted">{body}</p>
         <div className="live-stage-actions">
-          <Link href="/live" className="btn-primary text-sm">Watch lives</Link>
-          <Link href="/feed" className="live-ghost-button">Back to feed</Link>
+          {action ? (
+            <>
+              <Link href={action.href} className="btn-primary text-sm">{action.label}</Link>
+              <Link href="/live" className="live-ghost-button">Watch lives</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/live" className="btn-primary text-sm">Watch lives</Link>
+              <Link href="/feed" className="live-ghost-button">Back to feed</Link>
+            </>
+          )}
         </div>
       </section>
     </main>
@@ -39,7 +59,7 @@ export default async function GoLivePage() {
 
   const profile = await db.profile.findUnique({
     where: { userId },
-    select: { role: true, displayName: true, avatarUrl: true, adminHidden: true },
+    select: { role: true, displayName: true, avatarUrl: true, adminHidden: true, plan: true, subscriptionExpiresAt: true },
   });
   if (!profile) redirect("/onboarding");
   if (profile.role !== "ESCORT") {
@@ -53,6 +73,17 @@ export default async function GoLivePage() {
   }
 
   const active = await getActiveSessionForHost(userId);
+  // A live already running may finish even if the plan lapsed during it.
+  if (!active && !hasActivePaidPlan(profile)) {
+    return (
+      <Notice
+        title="Going live needs an active plan"
+        body="Hosting lives and earning from gifts are part of the paid plans. Renew or upgrade your plan to go live."
+        avatarUrl={profile.avatarUrl}
+        action={{ href: "/premium", label: "See plans" }}
+      />
+    );
+  }
   return (
     <GoLiveStudio
       hostId={userId}

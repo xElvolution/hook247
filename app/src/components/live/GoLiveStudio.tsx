@@ -12,10 +12,14 @@ import {
   type LocalTrack,
   type LocalVideoTrack,
 } from "livekit-client";
-import { Coins, Eye, Loader2, Mic, MicOff, Radio, RefreshCw, SwitchCamera, Trophy, Video, VideoOff, X } from "lucide-react";
+import { Eye, Loader2, Mic, MicOff, Radio, RefreshCw, SwitchCamera, Trophy, Video, VideoOff, Wallet, X } from "lucide-react";
+import { useRealtimeEvent } from "@/lib/realtimeClient";
 import LiveChatPanel from "./LiveChatPanel";
 import GiftOverlay from "./GiftOverlay";
-import { formatElapsed, parseLiveEvent, type LiveComment, type LiveGiftEvent, type LiveSummary } from "./types";
+import { formatElapsed, parseLiveEvent, type LiveComment, type LiveEarning, type LiveGiftEvent, type LiveSummary } from "./types";
+
+const nairaFmt = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const nairaText = (kobo: number) => nairaFmt.format(kobo / 100);
 
 type Stage = "setup" | "starting" | "live" | "ending" | "summary";
 
@@ -46,12 +50,22 @@ export default function GoLiveStudio({
   const [viewers, setViewers] = useState(0);
   const [peak, setPeak] = useState(0);
   const [coins, setCoins] = useState(0);
+  const [earnedKobo, setEarnedKobo] = useState(0);
+  const seenEarnings = useRef(new Set<string>());
   const [elapsed, setElapsed] = useState(0);
   const [comments, setComments] = useState<LiveComment[]>([]);
   const [giftEvents, setGiftEvents] = useState<LiveGiftEvent[]>([]);
   const [summary, setSummary] = useState<LiveSummary | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+
+  // Your share of each gift arrives privately, so the counter shows real naira earned.
+  useRealtimeEvent<LiveEarning>("live:earning", (event) => {
+    if (!session || event.sessionId !== session.id) return;
+    if (seenEarnings.current.has(event.id)) return;
+    seenEarnings.current.add(event.id);
+    setEarnedKobo((k) => k + event.shareKobo);
+  });
 
   const stopTracks = useCallback(() => {
     tracksRef.current.forEach((t) => t.stop());
@@ -176,6 +190,8 @@ export default function GoLiveStudio({
       setComments([]);
       setGiftEvents([]);
       setCoins(0);
+      setEarnedKobo(0);
+      seenEarnings.current.clear();
       setPeak(0);
       await connect(next.id, data.url, data.token);
       setStage("live");
@@ -212,6 +228,7 @@ export default function GoLiveStudio({
       if (summaryRes.ok) {
         const s = (await summaryRes.json()) as LiveSummary;
         setCoins(s.coinsEarned);
+        setEarnedKobo(s.earnedKobo);
         setPeak(s.peakViewers);
       }
       roomRef.current?.removeAllListeners();
@@ -302,9 +319,9 @@ export default function GoLiveStudio({
           {summary ? (
             <>
               <div className="live-summary-coins">
-                <Coins className="h-6 w-6" />
-                <strong>{summary.coinsEarned.toLocaleString("en-NG")}</strong>
-                <span>coins earned · withdraw them any time from the Coins page</span>
+                <Wallet className="h-6 w-6" />
+                <strong>{nairaText(summary.earnedKobo)}</strong>
+                <span>added to your Earnings Wallet from {summary.coinsEarned.toLocaleString("en-NG")} coins in gifts</span>
               </div>
               <dl className="live-summary-grid">
                 <div><dt>Duration</dt><dd>{formatElapsed(summary.durationSeconds)}</dd></div>
@@ -330,7 +347,7 @@ export default function GoLiveStudio({
             <p className="text-sm text-muted">{error}</p>
           )}
           <div className="live-stage-actions">
-            <Link href="/coins" className="btn-primary text-sm">Open wallet</Link>
+            <Link href="/coins" className="btn-primary text-sm">Open Earnings Wallet</Link>
             <button type="button" className="live-ghost-button" onClick={() => { setSummary(null); setError(""); setStage("setup"); openCamera(facing); }}>
               Go live again
             </button>
@@ -358,7 +375,9 @@ export default function GoLiveStudio({
           {live ? (
             <>
               <span><Eye className="h-4 w-4" /> {viewers.toLocaleString("en-NG")}</span>
-              <span className="live-coin-stat"><Coins className="h-4 w-4" /> {coins.toLocaleString("en-NG")}</span>
+              <span className="live-coin-stat" title={`${coins.toLocaleString("en-NG")} coins received`}>
+                <Wallet className="h-4 w-4" /> {nairaText(earnedKobo)}
+              </span>
               <time>{formatElapsed(elapsed)}</time>
             </>
           ) : null}
@@ -448,7 +467,7 @@ export default function GoLiveStudio({
                   minLength={3}
                 />
                 <p className="live-setup-note">
-                  Viewers can comment and send gifts. Gifts land in your coin wallet straight away and can be withdrawn from the Coins page.
+                  Viewers can comment and send gifts. Your share of every gift goes straight into your Earnings Wallet, ready to withdraw while your plan is active.
                 </p>
                 <button type="submit" className="btn-primary w-full text-sm" disabled={stage === "starting" || !!camError}>
                   {stage === "starting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}

@@ -62,7 +62,7 @@ export default function LiveDirectory({
         <section className="live-lobby-empty">
           <Radio className="h-8 w-8" />
           <h1>Nobody is live right now</h1>
-          <p>{canGoLive ? "Be the first. Go live and earn coins from gifts." : "Lives show up here the moment an escort starts streaming."}</p>
+          <p>{canGoLive ? "Be the first. Go live and earn from every gift." : "Lives show up here the moment an escort starts streaming."}</p>
           {canGoLive ? <Link href="/live/go" className="btn-primary text-sm">Start a live</Link> : <Link href="/feed" className="btn-primary text-sm">Back to feed</Link>}
         </section>
       ) : (

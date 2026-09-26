@@ -205,3 +205,39 @@
 .coin-withdraw-hint[data-tone="bad"] {
   color: #fca5a5;
 }
+
+.withdraw-confirm-breakdown {
+  margin: 0.9rem 0 0;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.35rem 0.85rem;
+  text-align: left;
+}
+
+.withdraw-confirm-breakdown div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  font-size: 0.82rem;
+}
+
+.withdraw-confirm-breakdown div + div {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.withdraw-confirm-breakdown dt {
+  color: var(--color-muted);
+}
+
+.withdraw-confirm-breakdown dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.withdraw-confirm-breakdown [data-total="true"] dt,
+.withdraw-confirm-breakdown [data-total="true"] dd {
+  color: #fff;
+  font-weight: 800;
+}

@@ -64,6 +64,7 @@ export default function LiveStreamViewer({
   const [muted, setMuted] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [sendingGift, setSendingGift] = useState<string | null>(null);
+  const pendingGift = useRef<{ giftId: string; nonce: string } | null>(null);
   const [giftError, setGiftError] = useState("");
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -228,7 +229,9 @@ export default function LiveStreamViewer({
     }
     setSendingGift(gift.id);
     setGiftError("");
-    const nonce = newNonce();
+    // Reuse the key if the last try for this gift never got an answer, so a retry cannot charge twice.
+    const nonce = pendingGift.current?.giftId === gift.id ? pendingGift.current.nonce : newNonce();
+    pendingGift.current = { giftId: gift.id, nonce };
     try {
       const res = await fetch(`/api/live/${session.id}/gift`, {
         method: "POST",
@@ -236,6 +239,7 @@ export default function LiveStreamViewer({
         body: JSON.stringify({ giftId: gift.id, nonce }),
       });
       const data = await res.json().catch(() => ({}));
+      pendingGift.current = null;
       if (!res.ok) {
         setGiftError(data.error || "Could not send that gift");
         return;
