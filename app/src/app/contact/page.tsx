@@ -20,20 +20,20 @@ export default function ContactPage() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <a
-          href="mailto:support@hook247.app"
+          href="mailto:support@flirta247.com"
           className="glass rounded-3xl p-6 transition hover:border-white/25"
         >
           <Mail className="h-6 w-6 text-[#ff5d52]" />
           <h2 className="font-display mt-3 font-bold">Support</h2>
-          <p className="mt-1 text-sm text-muted">support@hook247.app</p>
+          <p className="mt-1 text-sm text-muted">support@flirta247.com</p>
         </a>
         <a
-          href="mailto:safety@hook247.app"
+          href="mailto:safety@flirta247.com"
           className="glass rounded-3xl p-6 transition hover:border-white/25"
         >
           <Flag className="h-6 w-6 text-[#ff5d52]" />
           <h2 className="font-display mt-3 font-bold">Report a profile</h2>
-          <p className="mt-1 text-sm text-muted">safety@hook247.app</p>
+          <p className="mt-1 text-sm text-muted">safety@flirta247.com</p>
         </a>
       </div>
 

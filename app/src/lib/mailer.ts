@@ -11,8 +11,8 @@ const port = Number(process.env.EMAIL_PORT ?? 465);
 const user = process.env.EMAIL_USER ?? "";
 const pass = process.env.EMAIL_PASSWORD ?? "";
 
-export const MAIL_FROM = process.env.EMAIL_FROM ?? "support@hooks247.com";
-const FROM_DISPLAY = `"Hooks247" <${MAIL_FROM}>`;
+export const MAIL_FROM = process.env.EMAIL_FROM ?? "support@flirta247.com";
+const FROM_DISPLAY = `"Flirta247" <${MAIL_FROM}>`;
 
 const globalForMail = globalThis as unknown as {
   mailer?: nodemailer.Transporter;
@@ -43,7 +43,7 @@ export async function sendMail({ to, subject, html, text }: Mail) {
   await transporter().sendMail({ from: FROM_DISPLAY, to, subject, html, text });
 }
 
-/** Shared shell so every Hook247 email looks like it came from the same place. */
+/** Shared shell so every Flirta247 email looks like it came from the same place. */
 function layout(heading: string, body: string) {
   return `<!DOCTYPE html>
 <html>
@@ -51,14 +51,14 @@ function layout(heading: string, body: string) {
   <body style="margin:0;padding:24px;background:#0b0710;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#f4eef7">
     <div style="max-width:560px;margin:0 auto;overflow:hidden;border-radius:24px;border:1px solid #2a1f33;background:#120c1a">
       <div style="background:linear-gradient(135deg,#ff2d78,#ff6b2c);padding:28px;text-align:center">
-        <h1 style="margin:0;font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px">Hooks247</h1>
+        <h1 style="margin:0;font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px">Flirta247</h1>
       </div>
       <div style="padding:32px">
         <h2 style="margin:0 0 14px;font-size:20px;color:#fff">${heading}</h2>
         ${body}
       </div>
       <div style="padding:18px;text-align:center;border-top:1px solid #2a1f33;color:#8d7f99;font-size:12px">
-        You are receiving this because someone used this address on Hooks247.
+        You are receiving this because someone used this address on Flirta247.
       </div>
     </div>
   </body>
@@ -78,14 +78,14 @@ export async function sendVerificationEmail(
 ) {
   await sendMail({
     to,
-    subject: "Confirm your Hooks247 account",
+    subject: "Confirm your Flirta247 account",
     html: layout(
       "Confirm your email",
       `<p style="margin:0;color:#c9bcd4;line-height:1.6">Enter this code to finish setting up your account.</p>
        ${codeBlock(code)}
        <p style="margin:0;color:#8d7f99;font-size:13px">The code expires in ${minutes} minutes. If you did not sign up, ignore this email.</p>`
     ),
-    text: `Confirm your Hooks247 email.\n\nCode: ${code}\n\nExpires in ${minutes} minutes. If you did not sign up, ignore this email.`,
+    text: `Confirm your Flirta247 email.\n\nCode: ${code}\n\nExpires in ${minutes} minutes. If you did not sign up, ignore this email.`,
   });
 }
 
@@ -96,14 +96,14 @@ export async function sendPasswordResetEmail(
 ) {
   await sendMail({
     to,
-    subject: "Reset your Hooks247 password",
+    subject: "Reset your Flirta247 password",
     html: layout(
       "Reset your password",
       `<p style="margin:0;color:#c9bcd4;line-height:1.6">Use this code to choose a new password.</p>
        ${codeBlock(code)}
        <p style="margin:0;color:#8d7f99;font-size:13px">The code expires in ${minutes} minutes. If you did not ask for a reset, your password is unchanged and you can ignore this email.</p>`
     ),
-    text: `Reset your Hooks247 password.\n\nCode: ${code}\n\nExpires in ${minutes} minutes. If you did not ask for a reset, ignore this email.`,
+    text: `Reset your Flirta247 password.\n\nCode: ${code}\n\nExpires in ${minutes} minutes. If you did not ask for a reset, ignore this email.`,
   });
 }
 
@@ -138,6 +138,6 @@ export async function sendMatchEmail(to: string, matchName: string) {
       `<p style="margin:0 0 20px;color:#c9bcd4;line-height:1.6"><strong style="color:#fff">${matchName}</strong> liked you back. Say something before the moment passes.</p>
        <a href="${process.env.NEXT_PUBLIC_APP_URL ?? ""}/matches" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">Open chat</a>`
     ),
-    text: `You matched with ${matchName}! Open Hooks247 to start chatting.`,
+    text: `You matched with ${matchName}! Open Flirta247 to start chatting.`,
   });
 }

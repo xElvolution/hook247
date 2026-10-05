@@ -134,7 +134,7 @@ function Brand() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.png" alt="" className="h-6 w-6 shrink-0 rounded-md sm:h-8 sm:w-8" />
       <span className="brand-wordmark font-display text-[13px] font-extrabold tracking-tight text-white sm:text-base">
-        Hooks<span className="text-[#e7658a]">247</span>
+        Flirta<span className="text-[#e7658a]">247</span>
       </span>
     </span>
   );
@@ -197,7 +197,7 @@ export default function Shell({
             <Menu className="h-5 w-5" />
           </button>
 
-          <Link href="/" aria-label="Hooks247 home" className="min-w-0">
+          <Link href="/" aria-label="Flirta247 home" className="min-w-0">
             <Brand />
           </Link>
 

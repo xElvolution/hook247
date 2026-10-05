@@ -17,17 +17,20 @@ import {
 gsap.registerPlugin(ScrollTrigger);
 
 // The app lives in its own project — all CTAs cross over to it.
-const FALLBACK_APP = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.hooks247.com";
+const FALLBACK_APP = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.flirta247.com";
 
 function resolveAppOrigin() {
   if (typeof window === "undefined") return FALLBACK_APP;
   const { protocol, hostname } = window.location;
   if (
+    hostname === "flirta247.com" ||
+    hostname === "www.flirta247.com" ||
+    hostname === "app.flirta247.com" ||
     hostname === "hooks247.com" ||
     hostname === "www.hooks247.com" ||
     hostname === "app.hooks247.com"
   ) {
-    return "https://app.hooks247.com";
+    return "https://app.flirta247.com";
   }
   if (hostname.startsWith("app.")) return `${protocol}//${hostname}`;
   return `${protocol}//app.${hostname}`;
@@ -190,7 +193,7 @@ export default function Landing() {
         <div className="flex items-center gap-2 font-display text-base font-extrabold tracking-tight md:text-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg md:h-9 md:w-9" />
-          Hooks<span className="text-gradient">247</span>
+          Flirta<span className="text-gradient">247</span>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <a href={`${APP}/login`} className="btn-ghost !rounded-lg !px-3.5 !py-2 text-sm md:!px-5">
@@ -343,10 +346,10 @@ export default function Landing() {
       <footer className="relative z-10 border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-muted md:flex-row">
           <div className="font-display font-bold text-ink">
-            Hooks<span className="text-gradient">247</span>
+            Flirta<span className="text-gradient">247</span>
           </div>
           <p>Strictly 18+. Be kind, be real, be safe.</p>
-          <p>© {new Date().getFullYear()} Hooks247</p>
+          <p>© {new Date().getFullYear()} Flirta247</p>
         </div>
       </footer>
     </div>

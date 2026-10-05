@@ -1,6 +1,6 @@
 /** Canonical public origin of the dating app (emails, absolute links). */
 export function canonicalAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.hooks247.com").replace(
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.flirta247.com").replace(
     /\/$/,
     ""
   );

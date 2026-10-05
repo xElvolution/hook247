@@ -70,14 +70,14 @@ All demo fallbacks removed. Every route reads from Postgres:
 ## ⏳ Pending (User Action Required)
 
 ### 1. Email — configured and verified ✅
-`support@hooks247.com` (Hostinger SMTP, port 465) is wired into `.env` and a live
+`support@flirta247.com` (Hostinger SMTP, port 465) is wired into `.env` and a live
 send test was accepted for delivery. This covers signup verification codes,
 password reset, match notifications, and payment receipts.
 
-Note: the sending domain is **hooks247.com** (with the `s`). The bare
+Note: the sending domain is **flirta247.com** (with the `s`). The bare
 `hook247.com` has a null MX and `v=spf1 -all`, so it can neither send nor receive
 mail — do not use it as `EMAIL_FROM`. Before launch, add SPF/DKIM/DMARC records
-for hooks247.com in DNS so mail lands in inboxes rather than spam.
+for flirta247.com in DNS so mail lands in inboxes rather than spam.
 
 ### 2. Rotate the Neon password
 The `DATABASE_URL` password was pasted in plaintext into a terminal session and

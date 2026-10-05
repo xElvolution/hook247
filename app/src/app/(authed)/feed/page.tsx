@@ -139,7 +139,7 @@ function PostCard({
 
   async function share() {
     const url = `${window.location.origin}/feed#${post.id}`;
-    if (navigator.share) await navigator.share({ title: "Hook247 Pulse", url }).catch(() => undefined);
+    if (navigator.share) await navigator.share({ title: "Flirta247 Pulse", url }).catch(() => undefined);
     else await navigator.clipboard.writeText(url).catch(() => undefined);
   }
 
@@ -453,7 +453,7 @@ export default function FeedPage() {
         <div className="section-heading-row items-end">
           <div>
             <p className="section-kicker"><Sparkles className="h-3.5 w-3.5" /> Community</p>
-            <h1 className="font-display mt-2 text-xl font-extrabold sm:text-2xl">Hooks247 Pulse</h1>
+            <h1 className="font-display mt-2 text-xl font-extrabold sm:text-2xl">Flirta247 Pulse</h1>
           </div>
           <span className="text-xs text-muted">Fresh from the community</span>
         </div>
@@ -497,7 +497,7 @@ export default function FeedPage() {
           </div>
         ) : (eroticaMode && eroticaState !== "ready") ? null : (
         <form id="feed-composer" onSubmit={publish} className="pulse-composer mt-4">
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Hooks247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Flirta247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
           {pollMode && !eroticaMode && <PollBuilder value={pollDraft} onChange={setPollDraft} />}
           {previewUrl && (
             <div className="pulse-upload-preview">
@@ -568,7 +568,7 @@ export default function FeedPage() {
 
       <aside className="pulse-sidebar">
         <section>
-          <div className="pulse-sidebar-heading"><span><Radio className="h-4 w-4 text-emerald-400" /> Live on Hooks247</span><Link href="/live">See all</Link></div>
+          <div className="pulse-sidebar-heading"><span><Radio className="h-4 w-4 text-emerald-400" /> Live on Flirta247</span><Link href="/live">See all</Link></div>
           <div className="pulse-live-list">
             {liveProfiles.map((profile) => (
               <Link key={profile.userId} href={`/live/${encodeURIComponent(profile.userId)}`}>

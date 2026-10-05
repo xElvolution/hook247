@@ -91,11 +91,11 @@ export function PwaBanner({
   if (!show || !canOffer) return null;
 
   return (
-    <div className="pwa-banner" role="dialog" aria-label="Install Hooks247">
+    <div className="pwa-banner" role="dialog" aria-label="Install Flirta247">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.png" alt="" />
       <div>
-        <strong>Install Hooks247</strong>
+        <strong>Install Flirta247</strong>
         <span>Add it to your home screen and open it like an app.</span>
       </div>
       <button type="button" className="btn-primary !px-3 !py-1.5 text-xs" onClick={onInstall}>

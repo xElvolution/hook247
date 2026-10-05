@@ -136,7 +136,7 @@ export default function AdminShell({
 
         <div className="min-w-0">
           <p className="font-display text-sm font-bold leading-none sm:text-base">
-            Hooks<span className="text-brand">247</span>
+            Flirta<span className="text-brand">247</span>
             <span className="admin-chip">Admin</span>
           </p>
           <p className="mt-1 truncate text-xs text-muted">{currentLabel}</p>

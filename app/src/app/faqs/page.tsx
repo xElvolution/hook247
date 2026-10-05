@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 const FAQS = [
   {
-    q: "Is Hooks247 free?",
+    q: "Is Flirta247 free?",
     a: "Yes. Clients browse profiles with no account. Ladies create a profile for free. You only pay if you want a Boost or a paid featured profile.",
   },
   {

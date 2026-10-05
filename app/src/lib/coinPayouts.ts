@@ -58,7 +58,7 @@ export async function payWithdrawalViaPaystack(withdrawalId: string) {
       amountKobo: w.amountKobo,
       recipientCode,
       reference,
-      reason: "Hooks247 earnings payout",
+      reason: "Flirta247 earnings payout",
     });
     await db.coinWithdrawal.update({ where: { id: w.id }, data: { transferCode: transfer.transferCode } });
     if (transfer.status === "success") {

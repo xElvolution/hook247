@@ -134,7 +134,7 @@ export default function SignupPage() {
             onChange={(e) => setAgreed(e.target.checked)}
             className="mt-0.5 h-4 w-4 accent-[#ff2d78]"
           />
-          I confirm I am 18 years or older and agree to keep Hooks247 respectful
+          I confirm I am 18 years or older and agree to keep Flirta247 respectful
           and safe.
         </label>
 

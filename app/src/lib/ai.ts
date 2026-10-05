@@ -81,8 +81,8 @@ async function complete(prompt: string, variation: number) {
       headers: {
         Authorization: `Bearer ${openrouter}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://hooks247.com",
-        "X-Title": "Hooks247",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com",
+        "X-Title": "Flirta247",
       },
       body: JSON.stringify({
         model: "x-ai/grok-4.3",

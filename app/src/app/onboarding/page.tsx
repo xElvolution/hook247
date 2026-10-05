@@ -598,7 +598,7 @@ function ProfileSetup() {
           <div className="setup-congrats-mark">
             <Check className="h-8 w-8" />
           </div>
-          <p className="section-kicker">Hooks247</p>
+          <p className="section-kicker">Flirta247</p>
           <h1 className="font-display mt-2 text-3xl font-extrabold">Congratulations</h1>
           <p className="mt-3 text-sm text-muted">
             Your account has been created.

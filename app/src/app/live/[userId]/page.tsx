@@ -13,10 +13,10 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ userId: string }> }): Promise<Metadata> {
   const { userId } = await params;
   const live = await liveForHost(userId, null).catch(() => null);
-  if (!live) return { title: "Live room | Hooks247" };
+  if (!live) return { title: "Live room | Flirta247" };
   return {
-    title: `${live.host.displayName} is live | Hooks247`,
-    description: `Watch ${live.host.displayName}'s live room on Hooks247.`,
+    title: `${live.host.displayName} is live | Flirta247`,
+    description: `Watch ${live.host.displayName}'s live room on Flirta247.`,
   };
 }
 

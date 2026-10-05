@@ -9,7 +9,7 @@ import { getActiveSessionForHost, liveConfigured } from "@/lib/live";
 import { hasActivePaidPlan } from "@/lib/eligibility";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Go live | Hooks247" };
+export const metadata: Metadata = { title: "Go live | Flirta247" };
 
 function Notice({
   title,

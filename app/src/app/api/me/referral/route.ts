@@ -73,7 +73,7 @@ export async function GET() {
     }),
   ]);
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.hooks247.com").replace(/\/$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.flirta247.com").replace(/\/$/, "");
   const code = refreshed?.referralCode ?? "";
 
   return NextResponse.json({

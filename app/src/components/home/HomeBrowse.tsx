@@ -238,7 +238,7 @@ export default function HomeBrowse({ authed }: { authed: boolean }) {
           <div className="section-heading-row">
             <div>
               <p className="section-kicker">
-                <Flame className="h-3.5 w-3.5 fill-current" /> Hooks247 picks
+                <Flame className="h-3.5 w-3.5 fill-current" /> Flirta247 picks
               </p>
               <h2 className="font-display mt-1.5 text-xl font-bold">Featured profiles</h2>
             </div>

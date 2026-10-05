@@ -1,5 +1,5 @@
 import LoadingScreen from "@/components/LoadingScreen";
 
 export default function Loading() {
-  return <LoadingScreen label="Loading Hooks247" />;
+  return <LoadingScreen label="Loading Flirta247" />;
 }

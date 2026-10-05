@@ -42,7 +42,7 @@ export default function LiveDirectory({
       <header className="live-lobby-top">
         <Link href="/feed" aria-label="Close live" className="stream-icon-button"><X className="h-5 w-5" /></Link>
         <div>
-          <strong>Hooks247 Live</strong>
+          <strong>Flirta247 Live</strong>
           <small>{lives.length ? `${lives.length} live now` : "No one live yet"}</small>
         </div>
         {canGoLive ? (

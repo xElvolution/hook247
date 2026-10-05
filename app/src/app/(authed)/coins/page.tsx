@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import CoinsView from "@/components/coins/CoinsView";
 import { getSessionUserId } from "@/lib/session";
 
-export const metadata = { title: "Coins | Hooks247" };
+export const metadata = { title: "Coins | Flirta247" };
 
 function firstParam(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] ?? "";

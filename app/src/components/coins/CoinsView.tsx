@@ -321,7 +321,7 @@ function ClientWallet({ data, flashes, onError }: { data: ClientData; flashes: R
       ) : null}
 
       <p className="mt-8 text-center text-xs text-muted">
-        Coins are for gifting on Hooks247 only. They cannot be converted to cash or refunded once sent. <Link href="/faqs" className="underline">FAQs</Link>
+        Coins are for gifting on Flirta247 only. They cannot be converted to cash or refunded once sent. <Link href="/faqs" className="underline">FAQs</Link>
       </p>
     </div>
   );

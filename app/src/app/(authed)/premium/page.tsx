@@ -6,7 +6,7 @@ import { fulfilPayment } from "@/lib/fulfilPayment";
 import { publicWidgetConfig } from "@/lib/dojah";
 import { isMockUserId, mockCurrentUser } from "@/lib/mock";
 
-export const metadata = { title: "Premium | Hooks247" };
+export const metadata = { title: "Premium | Flirta247" };
 
 function firstParam(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] ?? "";

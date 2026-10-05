@@ -283,7 +283,7 @@ export default function LiveStreamViewer({
 
       <header className="stream-header">
         <Link href="/live" className="stream-icon-button" aria-label="Close live room"><X className="h-5 w-5" /></Link>
-        <strong className="stream-brand">Hooks<span>247</span></strong>
+        <strong className="stream-brand">Flirta<span>247</span></strong>
         {phase !== "ended" || !authed ? <span className="stream-live-badge"><Radio className="h-3 w-3" /> LIVE</span> : null}
         {phase !== "ended" ? (
           <div className="stream-stats">

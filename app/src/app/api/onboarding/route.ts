@@ -129,7 +129,7 @@ export async function POST(req: Request) {
   const birth = new Date(data.birthDate);
   if (ageFrom(birth) < 18) {
     return NextResponse.json(
-      { error: "You must be 18 or older to join Hook247." },
+      { error: "You must be 18 or older to join Flirta247." },
       { status: 403 }
     );
   }

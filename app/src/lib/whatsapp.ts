@@ -58,8 +58,8 @@ export function whatsappHref(digits: string, displayName?: string, country = "Ni
   if (!n) return "";
   const text = encodeURIComponent(
     displayName
-      ? `Hi ${displayName}, I saw your profile on Hooks247.`
-      : "Hi, I saw your profile on Hooks247."
+      ? `Hi ${displayName}, I saw your profile on Flirta247.`
+      : "Hi, I saw your profile on Flirta247."
   );
   return `https://wa.me/${n}?text=${text}`;
 }

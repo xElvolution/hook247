@@ -1,4 +1,4 @@
-// Realtime delivery for Hooks247: DMs (new message, typing, read receipts,
+// Realtime delivery for Flirta247: DMs (new message, typing, read receipts,
 // presence) and the public lounge. Messages are written by the Next.js app;
 // this process only fans events out to connected browsers.
 //
@@ -24,6 +24,9 @@ const origins = [
   "https://hooks247.com",
   "https://app.hooks247.com",
   "https://www.hooks247.com",
+  "https://flirta247.com",
+  "https://www.flirta247.com",
+  "https://app.flirta247.com",
   ...(process.env.REALTIME_EXTRA_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean),
 ];
 

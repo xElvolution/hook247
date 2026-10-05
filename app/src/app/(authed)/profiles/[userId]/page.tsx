@@ -78,11 +78,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { userId } = await params;
   const profile = await getPublicProfile(userId);
-  if (!profile) return { title: "Profile not found | Hook247" };
+  if (!profile) return { title: "Profile not found | Flirta247" };
 
   return {
-    title: `${profile.displayName}, ${profile.age} | Hook247`,
-    description: profile.bio || `View ${profile.displayName}'s public Hook247 profile.`,
+    title: `${profile.displayName}, ${profile.age} | Flirta247`,
+    description: profile.bio || `View ${profile.displayName}'s public Flirta247 profile.`,
   };
 }
 
@@ -129,8 +129,8 @@ export default async function PublicProfilePage({
       date: "This week",
     },
     {
-      title: "Joined Hook247",
-      body: `${profile.displayName} became part of the Hook247 community.`,
+      title: "Joined Flirta247",
+      body: `${profile.displayName} became part of the Flirta247 community.`,
       date: profile.joinedAt.toLocaleDateString("en", { month: "short", year: "numeric" }),
     },
   ];

@@ -156,13 +156,13 @@ export default function AgeGate() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" width={36} height={36} />
           <span className="font-display">
-            Hooks<span className="text-gradient">247</span>
+            Flirta<span className="text-gradient">247</span>
           </span>
         </div>
         <span className="age-gate-badge" aria-hidden="true">18+</span>
         <h2 id="age-gate-title" className="font-display">You must be 18 or older to enter</h2>
         <p id="age-gate-desc">
-          Hooks247 contains adult content, including escort listings and explicit material. By entering you
+          Flirta247 contains adult content, including escort listings and explicit material. By entering you
           confirm that you are at least 18 years old and that viewing adult content is legal where you are.
         </p>
         <div className="age-gate-actions">

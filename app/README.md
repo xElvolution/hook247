@@ -1,4 +1,4 @@
-# Hook247 — Dating that never sleeps 🔥
+# Flirta247 — Dating that never sleeps 🔥
 
 A full-stack dating platform built with Next.js 16, Prisma + Neon Postgres,
 Framer Motion and GSAP.
@@ -35,15 +35,15 @@ Copy `.env.example` to `.env` and fill in the values below.
    Rotating it invalidates every existing session. Missing this in production is a
    hard failure — a known fallback secret means anyone can forge a session cookie.
 
-3. **Email (Hostinger SMTP)** — from hPanel → Emails → the `support@hooks247.com`
+3. **Email (Hostinger SMTP)** — from hPanel → Emails → the `support@flirta247.com`
    mailbox:
 
    ```
    EMAIL_HOST="smtp.hostinger.com"
    EMAIL_PORT="465"          # 465 = implicit TLS, 587 = STARTTLS
-   EMAIL_USER="support@hooks247.com"
+   EMAIL_USER="support@flirta247.com"
    EMAIL_PASSWORD="<mailbox password>"
-   EMAIL_FROM="support@hooks247.com"
+   EMAIL_FROM="support@flirta247.com"
    ```
 
    Mail failures are surfaced, never swallowed — a signup that never receives its

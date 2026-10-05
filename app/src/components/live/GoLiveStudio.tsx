@@ -379,7 +379,7 @@ export default function GoLiveStudio({
         <Link href="/live" className="stream-icon-button" aria-label="Leave studio" onClick={(event) => { if (live) event.preventDefault(); }}>
           <X className="h-5 w-5" />
         </Link>
-        <strong className="stream-brand">Hooks<span>247</span> Studio</strong>
+        <strong className="stream-brand">Flirta<span>247</span> Studio</strong>
         {live ? <span className="stream-live-badge"><Radio className="h-3 w-3" /> LIVE</span> : null}
         <div className="stream-stats">
           {live ? (

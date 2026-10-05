@@ -6,7 +6,7 @@ const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hooks247",
+  title: "Flirta247",
   description:
     "Independent models, 24/7. Search by area, view photos and rates, then WhatsApp. Beauty may catch your eye. Personality keeps you here.",
   icons: {

@@ -2,7 +2,7 @@ import type { Plan } from "@prisma/client";
 import { db } from "./db";
 
 /**
- * Earning on Hooks247 (going live, receiving gifts, withdrawing) needs an
+ * Earning on Flirta247 (going live, receiving gifts, withdrawing) needs an
  * active paid plan. "Active" follows the same rule as the rest of the app: a
  * paid plan whose subscription has not run out yet.
  */

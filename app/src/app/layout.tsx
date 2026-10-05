@@ -9,14 +9,14 @@ const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hooks247",
+  title: "Flirta247",
   description:
     "Escort and client profiles, 24/7. Search by country and area, view photos and rates, then WhatsApp.",
-  applicationName: "Hooks247",
+  applicationName: "Flirta247",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Hooks247",
+    title: "Flirta247",
     statusBarStyle: "black-translucent",
   },
   icons: {

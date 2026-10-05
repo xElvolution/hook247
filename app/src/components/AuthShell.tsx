@@ -26,7 +26,7 @@ export default function AuthShell({
         <Link href="/" className="flex items-center gap-2 font-display text-xl font-extrabold">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-md" />
-          Hooks<span className="text-gradient">247</span>
+          Flirta<span className="text-gradient">247</span>
         </Link>
         <h1 className="font-display mt-6 text-3xl font-bold">{title}</h1>
         <p className="mt-2 text-sm text-muted">{subtitle}</p>
