@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRealtimeEvent } from "@/lib/realtimeClient";
 import { AnimatePresence, motion } from "framer-motion";
 import NavSearch from "@/components/NavSearch";
+import { InstallAppButton, IosInstallHelp, PwaBanner, usePwaInstall } from "@/components/PwaInstall";
 import {
   CircleHelp,
   Coins,
@@ -153,6 +154,7 @@ export default function Shell({
   const [avatarBroken, setAvatarBroken] = useState(false);
   const unread = useUnreadMessages(authed);
   const followers = useFollowers(authed);
+  const pwa = usePwaInstall();
   const badgeFor = (href: string) => (href === "/matches" ? unread : href === "/followers" ? followers.count : 0);
 
   const isActive = (href: string) =>
@@ -263,6 +265,14 @@ export default function Shell({
               {menu(PRIMARY_MENU)}
               <p className="side-nav-label mt-7">Account</p>
               {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => !MEMBER_ONLY.has(item.href)))}
+              <InstallAppButton
+                canOffer={pwa.canOffer}
+                onInstall={() => {
+                  setMenuOpen(false);
+                  void pwa.install();
+                }}
+                className="side-nav-link mt-2 w-full"
+              />
 
               {!authed && (
                 <div className="mt-7 grid gap-2">
@@ -286,6 +296,11 @@ export default function Shell({
 
           <p className="side-nav-label mt-7">Account</p>
           {menu(authed ? ACCOUNT_MENU : ACCOUNT_MENU.filter((item) => !MEMBER_ONLY.has(item.href)))}
+          <InstallAppButton
+            canOffer={pwa.canOffer}
+            onInstall={() => void pwa.install()}
+            className="side-nav-link mt-2 w-full"
+          />
 
           <Link href="/premium" className="premium-note mt-auto">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#df3a6a]/15 text-[#e7658a]">
@@ -300,6 +315,9 @@ export default function Shell({
 
         <main className="relative min-w-0 flex-1 pb-24 md:pb-6">{children}</main>
       </div>
+
+      <PwaBanner canOffer={pwa.canOffer} onInstall={() => void pwa.install()} />
+      <IosInstallHelp open={pwa.iosHelp} onClose={pwa.closeIosHelp} />
 
       <nav className="mobile-bottom-nav" aria-label="Primary navigation">
         {bottomMenu(authed).map((item) => {

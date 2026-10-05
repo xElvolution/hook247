@@ -10,7 +10,7 @@ import {
   type RemoteTrack,
   type RemoteParticipant,
 } from "livekit-client";
-import { BadgeCheck, Eye, Gift as GiftIcon, Loader2, MapPin, Radio, RefreshCw, Share2, UserRound, Volume2, VolumeX, X } from "lucide-react";
+import { BadgeCheck, ChevronDown, Eye, Gift as GiftIcon, Loader2, MapPin, Radio, RefreshCw, Share2, UserRound, Volume2, VolumeX, X } from "lucide-react";
 import LiveChatPanel from "@/components/live/LiveChatPanel";
 import GiftOverlay from "@/components/live/GiftOverlay";
 import GiftSheet from "@/components/live/GiftSheet";
@@ -68,6 +68,7 @@ export default function LiveStreamViewer({
   const [giftError, setGiftError] = useState("");
   const [notice, setNotice] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [hostOpen, setHostOpen] = useState(false);
   const returnTo = `/live/${encodeURIComponent(host.userId)}`;
 
   useEffect(() => {
@@ -294,25 +295,30 @@ export default function LiveStreamViewer({
 
       <div className="stream-layout">
         <aside className="stream-host-panel">
-          <div className="stream-host-identity">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {host.avatarUrl ? <img src={host.avatarUrl} alt={host.displayName} /> : <span className="live-avatar-fallback">{host.displayName.slice(0, 1)}</span>}
-            <div>
-              <h1>{host.displayName}, {host.age} {host.verified && <BadgeCheck className="h-4 w-4 fill-[#df3a6a] text-white" />}</h1>
-              <p><MapPin className="h-3.5 w-3.5" /> {[host.city, host.state].filter(Boolean).join(", ")}</p>
+          <details className="live-info-fold">
+            <summary>
+              <div className="stream-host-identity">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {host.avatarUrl ? <img src={host.avatarUrl} alt={host.displayName} /> : <span className="live-avatar-fallback">{host.displayName.slice(0, 1)}</span>}
+                <div>
+                  <h1>{host.displayName}, {host.age} {host.verified && <BadgeCheck className="h-4 w-4 fill-[#df3a6a] text-white" />}</h1>
+                  <p><MapPin className="h-3.5 w-3.5" /> {[host.city, host.state].filter(Boolean).join(", ")}</p>
+                </div>
+              </div>
+              <ChevronDown className="live-info-chevron" />
+            </summary>
+            <p className="live-title-line">{session.title}</p>
+            {host.bio ? <p className="stream-host-bio">{host.bio}</p> : null}
+            <div className="stream-host-tags">
+              {host.interests.slice(0, 4).map((interest) => <span key={interest}>#{interest}</span>)}
             </div>
-          </div>
-          <p className="live-title-line">{session.title}</p>
-          {host.bio ? <p className="stream-host-bio">{host.bio}</p> : null}
-          <div className="stream-host-tags">
-            {host.interests.slice(0, 4).map((interest) => <span key={interest}>#{interest}</span>)}
-          </div>
-          {host.services.length > 0 && (
-            <div className="stream-service-preview">
-              <small>Published services</small>
-              {host.services.slice(0, 3).map((service) => <span key={service}>{service}</span>)}
-            </div>
-          )}
+            {host.services.length > 0 && (
+              <div className="stream-service-preview">
+                <small>Published services</small>
+                {host.services.slice(0, 3).map((service) => <span key={service}>{service}</span>)}
+              </div>
+            )}
+          </details>
           <Link href={`/profiles/${encodeURIComponent(host.userId)}`} className="btn-primary mt-auto w-full text-sm">
             <UserRound className="h-4 w-4" /> View full profile
           </Link>
@@ -373,10 +379,18 @@ export default function LiveStreamViewer({
 
           <GiftOverlay gifts={giftEvents} />
 
-          <div className="stream-mobile-host">
-            <h1>{host.displayName}, {host.age}</h1>
-            <p><MapPin className="h-3.5 w-3.5" /> {host.city}</p>
-            <Link href={`/profiles/${encodeURIComponent(host.userId)}`}>View profile</Link>
+          <div className="stream-mobile-host" data-open={hostOpen}>
+            <button type="button" className="stream-mobile-host-toggle" onClick={() => setHostOpen((open) => !open)} aria-expanded={hostOpen}>
+              <h1>{host.displayName}, {host.age}</h1>
+              <ChevronDown className="live-info-chevron" />
+            </button>
+            {hostOpen ? (
+              <div className="stream-mobile-host-body">
+                <p className="live-title-line">{session.title}</p>
+                <p><MapPin className="h-3.5 w-3.5" /> {host.city}</p>
+                <Link href={`/profiles/${encodeURIComponent(host.userId)}`}>View profile</Link>
+              </div>
+            ) : null}
           </div>
           <nav className="stream-action-rail" aria-label="Live actions">
             {authed && phase !== "ended" ? (

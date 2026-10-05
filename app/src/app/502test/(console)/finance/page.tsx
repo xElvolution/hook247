@@ -1,18 +1,20 @@
 import { db } from "@/lib/db";
 import { nairaFromKobo, settleCommissions } from "@/lib/money";
+import { paidSince } from "@/lib/adminStats";
 import { Panel, Stat } from "@/components/admin/Ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinancePage() {
   await settleCommissions();
+  const since = await paidSince();
   const [subs, boosts, commissions, pending, withdrawn, pendingWd] = await Promise.all([
     db.payment.aggregate({
-      where: { status: "SUCCESS", purpose: { in: ["SUBSCRIPTION", "PLAN_PLUS", "PLAN_ELITE"] } },
+      where: { status: "SUCCESS", purpose: { in: ["SUBSCRIPTION", "PLAN_PLUS", "PLAN_ELITE"] }, createdAt: { gte: since } },
       _sum: { amountKobo: true },
     }),
     db.payment.aggregate({
-      where: { status: "SUCCESS", purpose: "BOOST" },
+      where: { status: "SUCCESS", purpose: "BOOST", createdAt: { gte: since } },
       _sum: { amountKobo: true },
     }),
     db.referralEarning.aggregate({

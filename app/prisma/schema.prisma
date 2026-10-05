@@ -488,6 +488,7 @@ model PlatformSettings {
   qualifyingPayments   Int      @default(3)
   minWithdrawalKobo    Int      @default(500000)
   holdHours            Int      @default(72)
+  revenueResetAt       DateTime?
   updatedAt            DateTime @updatedAt
 }
 

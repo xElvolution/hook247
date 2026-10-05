@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getOverview, naira } from "@/lib/adminStats";
-import { Stat, Panel, Bars, Empty } from "@/components/admin/Ui";
+import { Stat, Panel, Empty } from "@/components/admin/Ui";
+import AdminChart from "@/components/admin/AdminChart";
 
 export const dynamic = "force-dynamic";
 
@@ -52,21 +53,15 @@ export default async function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Signups (30 days)">
-          <Bars
-            data={s.signupSeries.map((d) => ({ day: d.day, value: d.n }))}
-            format={(v) => `${v} signup${v === 1 ? "" : "s"}`}
-          />
+        <Panel title="Signups">
+          <AdminChart series={s.signupChart} kind="count" />
           <p className="mt-3 text-xs text-muted">
             {s.newUsers30} in the last 30 days · {s.newUsers7} in the last 7
           </p>
         </Panel>
 
-        <Panel title="Revenue (30 days)">
-          <Bars
-            data={s.revenueSeries.map((d) => ({ day: d.day, value: d.kobo }))}
-            format={naira}
-          />
+        <Panel title="Revenue">
+          <AdminChart series={s.revenueChart} kind="naira" />
           <p className="mt-3 text-xs text-muted">
             {naira(s.revenue30Kobo)} collected in the last 30 days
           </p>

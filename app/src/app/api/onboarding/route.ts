@@ -199,5 +199,33 @@ export async function POST(req: Request) {
     include: { services: true },
   });
 
+  const pending = await db.adminAction.findMany({
+    where: { action: "grant.pending", targetType: "user", targetId: userId },
+  });
+  if (pending.length && data.role === "ESCORT") {
+    const now = new Date();
+    let boostMs = 0;
+    let planMs = 0;
+    for (const row of pending) {
+      const boostDays = Number(/boostDays=(\d+)/.exec(row.note)?.[1] ?? 0);
+      const planDays = Number(/planDays=(\d+)/.exec(row.note)?.[1] ?? 0);
+      boostMs += Math.max(0, boostDays) * 24 * 60 * 60 * 1000;
+      planMs += Math.max(0, planDays) * 24 * 60 * 60 * 1000;
+    }
+    const boostBase = profile.boostedUntil && profile.boostedUntil > now ? profile.boostedUntil : now;
+    const planBase = profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > now ? profile.subscriptionExpiresAt : now;
+    await db.profile.update({
+      where: { userId },
+      data: {
+        ...(planMs ? { plan: "PLUS", subscriptionPlanSlug: "monthly", subscriptionExpiresAt: new Date(planBase.getTime() + planMs) } : {}),
+        ...(boostMs ? { boostedAt: now, boostedUntil: new Date(boostBase.getTime() + boostMs), adminHidden: false } : {}),
+      },
+    });
+    await db.adminAction.updateMany({
+      where: { id: { in: pending.map((row) => row.id) } },
+      data: { action: "grant.applied" },
+    });
+  }
+
   return NextResponse.json({ ok: true, profile });
 }

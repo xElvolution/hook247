@@ -423,6 +423,7 @@ export default function FeedPage() {
     setMediaFile(file);
     setMediaKind(file.type.startsWith("video/") ? "video" : "image");
     setPreviewUrl(URL.createObjectURL(file));
+    setPollMode(false);
     setUploadError("");
   }
 
@@ -516,14 +517,14 @@ export default function FeedPage() {
           {uploadError && <p className="pulse-upload-error">{uploadError}</p>}
           <div className="pulse-composer-footer">
             <div className="pulse-upload-actions">
-              {!(pollMode && !eroticaMode) && <label>
+              <label data-active={mediaKind === "image"}>
                 <ImagePlus className="h-4 w-4" /> Photo
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => chooseMedia(event.target.files?.[0])} />
-              </label>}
-              {!(pollMode && !eroticaMode) && <label>
+              </label>
+              <label data-active={mediaKind === "video"}>
                 <Video className="h-4 w-4" /> Video
                 <input type="file" accept="video/mp4,video/webm" onChange={(event) => chooseMedia(event.target.files?.[0])} />
-              </label>}
+              </label>
               {!eroticaMode && (
                 <button type="button" onClick={togglePoll} data-active={pollMode} aria-pressed={pollMode}>
                   <BarChart3 className="h-4 w-4" /> Poll

@@ -705,6 +705,59 @@
 .coin-field input:focus,
 .coin-field select:focus { border-color: rgba(223, 58, 106, 0.65); }
 
+.bank-search {
+  position: relative;
+}
+
+.bank-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  z-index: 1;
+  height: 1rem;
+  width: 1rem;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.bank-search input {
+  padding-left: 2.2rem;
+}
+
+.bank-search-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  left: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 0.7rem;
+  background: #161417;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.bank-search-list button {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  color: #f3e9ee;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.bank-search-list button:hover {
+  background: rgba(223, 58, 106, 0.12);
+}
+
+.bank-search-empty {
+  padding: 0.75rem 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
 .coin-account-name {
   display: flex;
   align-items: center;
@@ -841,7 +894,7 @@
 .live-stage-state {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -850,7 +903,12 @@
   background: rgba(5, 5, 6, 0.62);
   padding: 1.5rem;
   text-align: center;
+  pointer-events: none;
   backdrop-filter: blur(6px);
+}
+
+.live-stage-state button {
+  pointer-events: auto;
 }
 
 .live-stage-state strong {
@@ -1428,6 +1486,54 @@
   font-size: 0.7rem !important;
 }
 
+.live-setup-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.live-info-fold summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.live-info-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.live-info-chevron {
+  flex: none;
+  height: 1rem;
+  width: 1rem;
+  color: var(--color-muted);
+  transition: transform 0.18s ease;
+}
+
+.live-info-fold[open] .live-info-chevron,
+.live-info-chevron[data-open="true"],
+.stream-mobile-host[data-open="true"] .live-info-chevron {
+  transform: rotate(180deg);
+}
+
+.stream-mobile-host-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+}
+
+.stream-mobile-host-body {
+  margin-top: 0.35rem;
+}
+
 @media (max-width: 680px) {
   .stream-layout.is-setup {
     display: block;
@@ -1435,7 +1541,7 @@
 
   .live-setup-panel {
     height: auto !important;
-    max-height: 60svh;
+    max-height: none;
   }
 
   .live-end-bar {

@@ -339,15 +339,16 @@ export default function HomeBrowse({ authed }: { authed: boolean }) {
         <div>
           <p className="section-kicker text-white/[0.65]">Your next move</p>
           <h2 className="font-display mt-2 text-2xl font-extrabold md:text-3xl">
-            Feature your profile.
+            {authed ? "Boost your profile." : "Feature your profile."}
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/[0.65]">
-            Add photos, rates and WhatsApp. Clients in your area can find you and
-            message you directly.
+            {authed
+              ? "Sit at the front of search in your city. A 7-day boost puts you on Red Hot and the featured rail."
+              : "Add photos, rates and WhatsApp. Clients in your area can find you and message you directly."}
           </p>
         </div>
-        <Link href="/signup" className="btn-light shrink-0 text-sm">
-          Sign up to get hooked
+        <Link href={authed ? "/premium" : "/signup"} className="btn-light shrink-0 text-sm">
+          {authed ? "Get a boost" : "Sign up to get hooked"}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </section>

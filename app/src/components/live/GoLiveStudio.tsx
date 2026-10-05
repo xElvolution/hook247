@@ -12,7 +12,7 @@ import {
   type LocalTrack,
   type LocalVideoTrack,
 } from "livekit-client";
-import { Eye, Loader2, Mic, MicOff, Radio, RefreshCw, SwitchCamera, Trophy, Video, VideoOff, Wallet, X } from "lucide-react";
+import { ChevronDown, Eye, Loader2, Mic, MicOff, Radio, RefreshCw, SwitchCamera, Trophy, Video, VideoOff, Wallet, X } from "lucide-react";
 import { useRealtimeEvent } from "@/lib/realtimeClient";
 import LiveChatPanel from "./LiveChatPanel";
 import GiftOverlay from "./GiftOverlay";
@@ -53,6 +53,7 @@ export default function GoLiveStudio({
   const [earnedKobo, setEarnedKobo] = useState(0);
   const seenEarnings = useRef(new Set<string>());
   const [elapsed, setElapsed] = useState(0);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [comments, setComments] = useState<LiveComment[]>([]);
   const [giftEvents, setGiftEvents] = useState<LiveGiftEvent[]>([]);
   const [summary, setSummary] = useState<LiveSummary | null>(null);
@@ -181,7 +182,7 @@ export default function GoLiveStudio({
       const res = await fetch("/api/live/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title: title.trim() || `${displayName} is live` }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start your live");
@@ -265,12 +266,21 @@ export default function GoLiveStudio({
     }
   }
 
-  function toggleCam() {
+  async function toggleCam() {
     const video = tracksRef.current.find((t) => t.kind === Track.Kind.Video) as LocalVideoTrack | undefined;
-    if (!video) return;
-    if (camOn) video.mute();
-    else video.unmute();
-    setCamOn(!camOn);
+    if (!video) {
+      await openCamera(facing);
+      setCamOn(true);
+      return;
+    }
+    if (camOn) {
+      await video.mute();
+      setCamOn(false);
+      return;
+    }
+    await video.unmute();
+    if (videoRef.current) video.attach(videoRef.current);
+    setCamOn(true);
   }
 
   function toggleMic() {
@@ -396,7 +406,15 @@ export default function GoLiveStudio({
               </button>
             </div>
           ) : null}
-          {!camOn && !camError ? <div className="live-stage-state"><VideoOff className="h-6 w-6" /><p>Camera is off</p></div> : null}
+          {!camOn && !camError ? (
+            <div className="live-stage-state">
+              <VideoOff className="h-6 w-6" />
+              <p>Camera is off</p>
+              <button type="button" className="btn-primary text-sm" onClick={() => void toggleCam()}>
+                <Video className="h-4 w-4" /> Turn camera on
+              </button>
+            </div>
+          ) : null}
           {reconnecting && live ? <div className="live-reconnecting"><Loader2 className="h-4 w-4 animate-spin" /> Reconnecting</div> : null}
 
           <GiftOverlay gifts={giftEvents} />
@@ -451,24 +469,31 @@ export default function GoLiveStudio({
               </div>
             ) : (
               <form className="live-setup-body" onSubmit={start}>
-                <div className="live-setup-host">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="live-avatar-fallback">{displayName.slice(0, 1)}</span>}
-                  <span>{displayName}</span>
-                </div>
-                <label htmlFor="live-title">Live title</label>
-                <input
-                  id="live-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  maxLength={80}
-                  placeholder="What are you up to tonight?"
-                  required
-                  minLength={3}
-                />
-                <p className="live-setup-note">
-                  Viewers can comment and send gifts. Your share of every gift goes straight into your Earnings Wallet, ready to withdraw while your plan is active.
-                </p>
+                <button type="button" className="live-setup-toggle" aria-expanded={setupOpen} onClick={() => setSetupOpen((open) => !open)}>
+                  <div className="live-setup-host">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="live-avatar-fallback">{displayName.slice(0, 1)}</span>}
+                    <span>{displayName}</span>
+                  </div>
+                  <ChevronDown className="live-info-chevron" data-open={setupOpen} />
+                </button>
+                {setupOpen ? (
+                  <>
+                    <label htmlFor="live-title">Live title</label>
+                    <input
+                      id="live-title"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      maxLength={80}
+                      placeholder="What are you up to tonight?"
+                      required
+                      minLength={3}
+                    />
+                    <p className="live-setup-note">
+                      Viewers can comment and send gifts. Your share of every gift goes straight into your Earnings Wallet, ready to withdraw while your plan is active.
+                    </p>
+                  </>
+                ) : null}
                 <button type="submit" className="btn-primary w-full text-sm" disabled={stage === "starting" || !!camError}>
                   {stage === "starting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
                   {stage === "starting" ? "Starting..." : "Go live"}

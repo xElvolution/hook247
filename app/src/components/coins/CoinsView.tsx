@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   ReceiptText,
+  Search,
   ShieldAlert,
   Star,
   Trash2,
@@ -610,6 +611,76 @@ function WithdrawPanel({ data, reload, onManageAccounts }: { data: EscortData; r
   );
 }
 
+function BankSearch({
+  banks,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  banks: { name: string; code: string }[];
+  value: string;
+  onChange: (code: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const selected = banks.find((bank) => bank.code === value);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? banks.filter((bank) => bank.name.toLowerCase().includes(q) || bank.code.includes(q))
+      : banks;
+    return list.slice(0, 50);
+  }, [banks, query]);
+
+  return (
+    <div className="bank-search">
+      <Search className="bank-search-icon" />
+      <input
+        value={open || !selected ? query : selected.name}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+        onFocus={() => {
+          setOpen(true);
+          setQuery(selected?.name ?? query);
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+          if (value) onChange("");
+        }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      />
+      {open && !disabled ? (
+        <ul className="bank-search-list" role="listbox">
+          {matches.length ? (
+            matches.map((bank) => (
+              <li key={bank.code}>
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(bank.code);
+                    setQuery(bank.name);
+                    setOpen(false);
+                  }}
+                >
+                  {bank.name}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="bank-search-empty">No bank matches that search.</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function AccountsPanel({ initial: accounts, reload }: { initial: Account[]; reload: () => Promise<void> }) {
   const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
   const [bankError, setBankError] = useState("");
@@ -734,10 +805,13 @@ function AccountsPanel({ initial: accounts, reload }: { initial: Account[]; relo
         <form onSubmit={save} className="mt-4 space-y-3">
           <label className="coin-field">
             <span>Bank name</span>
-            <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} disabled={!banks.length}>
-              <option value="">{banks.length ? "Choose your bank" : bankError || "Loading banks..."}</option>
-              {banks.map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
-            </select>
+            <BankSearch
+              banks={banks}
+              value={bankCode}
+              onChange={setBankCode}
+              disabled={!banks.length}
+              placeholder={banks.length ? "Search your bank" : bankError || "Loading banks..."}
+            />
           </label>
           <label className="coin-field">
             <span>Account number</span>
