@@ -1,4 +1,4 @@
-const CACHE = "flirta247-shell-v1";
+const CACHE = "flirta247-shell-v2";
 const PRECACHE = ["/", "/logo.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
