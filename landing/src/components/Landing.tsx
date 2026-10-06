@@ -192,7 +192,7 @@ export default function Landing() {
       <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 md:px-6 md:py-5">
         <div className="flex items-center gap-2 font-display text-base font-extrabold tracking-tight md:text-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" className="h-8 w-8 rounded-lg md:h-9 md:w-9" />
+          <img src="/logo-nav.png" alt="" width={234} height={160} className="h-9 w-auto shrink-0 md:h-11" />
           Flirta<span className="text-gradient">247</span>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
