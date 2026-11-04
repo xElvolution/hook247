@@ -4,6 +4,18 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin, logAdminAction } from "@/lib/adminSession";
 
+export async function setPlanRemindersEnabled(form: FormData) {
+  await requireAdmin();
+  const on = String(form.get("on") ?? "") === "1";
+  await db.platformSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", planRemindersEnabled: on },
+    update: { planRemindersEnabled: on },
+  });
+  await logAdminAction(on ? "plan_reminders_on" : "plan_reminders_off", "settings", "planRemindersEnabled");
+  revalidatePath("/502test/profiles");
+}
+
 export async function setFeaturedShowAll(form: FormData) {
   await requireAdmin();
   const on = String(form.get("on") ?? "") === "1";

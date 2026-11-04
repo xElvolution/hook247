@@ -190,3 +190,30 @@ export async function sendMatchEmail(to: string, matchName: string) {
     text: `You matched with ${matchName}! Open Flirta247 to start chatting.`,
   });
 }
+
+export type PlanReminderKind = "d3" | "d1" | "d0";
+
+/** Plan-expiry reminder. Pure builder so it can be previewed without SMTP. */
+export function planReminderMail(kind: PlanReminderKind, planLabel: string, expiresAt: Date) {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com").replace(/\/$/, "");
+  const renewUrl = `${app}/premium?renew=1`;
+  const when = expiresAt.toLocaleString("en-NG", { timeZone: "Africa/Lagos", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const copy = {
+    d3: { subject: `Your ${planLabel} plan ends in 3 days`, heading: "Your plan ends in 3 days", lead: `Your <strong style="color:#fff">${planLabel}</strong> plan ends on <strong style="color:#fff">${when}</strong> (Lagos time).` },
+    d1: { subject: `Your ${planLabel} plan ends tomorrow`, heading: "Your plan ends tomorrow", lead: `Your <strong style="color:#fff">${planLabel}</strong> plan ends tomorrow, <strong style="color:#fff">${when}</strong> (Lagos time).` },
+    d0: { subject: `Your ${planLabel} plan ends today`, heading: "Your plan ends today", lead: `Your <strong style="color:#fff">${planLabel}</strong> plan ends today at <strong style="color:#fff">${when}</strong> (Lagos time).` },
+  }[kind];
+  const html = layout(
+    copy.heading,
+    `<p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">${copy.lead}</p>
+     <p style="margin:0 0 22px;color:#c9bcd4;line-height:1.6">Renew now to stay listed and keep chatting without a break. Time you renew early is added on top of what you have left.</p>
+     <a href="${renewUrl}" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">Renew now</a>
+     <p style="margin:22px 0 0;color:#8d7f99;font-size:12px;line-height:1.6">Already renewed? You can ignore this email.</p>`
+  );
+  const text = `${copy.heading}\n\n${copy.lead.replace(/<[^>]+>/g, "")}\n\nRenew now to stay listed and keep chatting without a break: ${renewUrl}\n\nAlready renewed? You can ignore this email.`;
+  return { subject: copy.subject, html, text };
+}
+
+export async function sendPlanReminderEmail(to: string, kind: PlanReminderKind, planLabel: string, expiresAt: Date) {
+  await sendMail({ to, ...planReminderMail(kind, planLabel, expiresAt) });
+}

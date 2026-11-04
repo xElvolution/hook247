@@ -4,7 +4,8 @@ import { ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
 import { featuredShowAll, feedShowAnyWithMedia } from "@/lib/feedVisibility";
-import { setFeaturedShowAll, setFeedShowAnyWithMedia } from "./actions";
+import { setFeaturedShowAll, setFeedShowAnyWithMedia, setPlanRemindersEnabled } from "./actions";
+import { planRemindersEnabled } from "@/lib/planReminders";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function ProfilesAdminPage({
     db.profile.count({ where }),
   ]);
   const pages = Math.ceil(total / PAGE_SIZE);
-  const [anyMedia, featuredAll] = await Promise.all([feedShowAnyWithMedia(), featuredShowAll()]);
+  const [anyMedia, featuredAll, remindersOn] = await Promise.all([feedShowAnyWithMedia(), featuredShowAll(), planRemindersEnabled()]);
 
   return (
     <div className="space-y-5">
@@ -121,6 +122,27 @@ export default async function ProfilesAdminPage({
           className={`rounded-full px-4 py-2 text-sm font-semibold ${featuredAll ? "bg-brand text-white" : "border border-line text-muted"}`}
         >
           {featuredAll ? "ON · Turn off" : "OFF · Turn on"}
+        </button>
+      </form>
+
+      <form
+        action={setPlanRemindersEnabled}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">Plan-expiry reminder emails</p>
+          <p className="mt-1 text-xs text-muted">
+            {remindersOn
+              ? "ON: members get an email 3 days before, 1 day before and on the day their plan ends."
+              : "OFF: no plan-expiry reminder emails are sent."}
+          </p>
+        </div>
+        <input type="hidden" name="on" value={remindersOn ? "0" : "1"} />
+        <button
+          aria-pressed={remindersOn}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${remindersOn ? "bg-brand text-white" : "border border-line text-muted"}`}
+        >
+          {remindersOn ? "ON · Turn off" : "OFF · Turn on"}
         </button>
       </form>
 

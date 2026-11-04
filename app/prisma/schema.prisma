@@ -506,6 +506,8 @@ model PlatformSettings {
   feedShowAnyWithMedia Boolean  @default(true)
   /// Featured rail: include any listed member, not only boosted/verified.
   featuredShowAll      Boolean  @default(true)
+  /// Plan-expiry reminder emails (3 days, 1 day, day of).
+  planRemindersEnabled Boolean  @default(true)
   updatedAt            DateTime @updatedAt
 }
 
@@ -1016,4 +1018,17 @@ model BonusClaim {
   createdAt DateTime  @default(now())
 
   @@index([userId, claimedAt])
+}
+
+/// One row per plan-expiry reminder sent. Keyed by the expiry date so a renewal
+/// (new subscriptionExpiresAt) starts a fresh set of reminders.
+model PlanReminder {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  kind      String   // "d3" | "d1" | "d0"
+  sentAt    DateTime @default(now())
+
+  @@unique([userId, expiresAt, kind])
+  @@index([userId])
 }
