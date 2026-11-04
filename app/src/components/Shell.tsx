@@ -317,7 +317,7 @@ export default function Shell({
         </aside>
 
         <main className="relative min-w-0 flex-1 pb-24 md:pb-6">
-          {authed && pathname === "/" ? <WelcomeBanner /> : null}
+          {pathname === "/" ? <WelcomeBanner /> : null}
           {children}
         </main>
       </div>

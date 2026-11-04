@@ -503,14 +503,14 @@ export async function welcomeNotice(userId: string) {
         bannedAt: true,
         welcomeNotifiedAt: true,
         rewardPillDismissedAt: true,
-        profile: { select: { gender: true } },
+        referralCode: true,
+        profile: { select: { gender: true, verified: true, verifiedSource: true } },
       },
     }),
     db.welcomeReward.findUnique({ where: { userId } }),
     issuedCount(),
   ]);
   if (!user || user.bannedAt) return { show: false as const };
-  if (user.rewardPillDismissedAt) return { show: false as const };
   if (user.profile?.gender === "MALE") return { show: false as const };
   const active = reward && reward.status !== "VOID" && reward.status !== "WITHDRAWN";
   const open = settings.enabled && issued < settings.participantLimit;
@@ -533,14 +533,49 @@ export async function welcomeNotice(userId: string) {
   }
 
   const short = amountLabel.replace(/,000$/, "k");
-  const title = `${short} Reward`;
-  let body = "";
-  if (reward?.status === "LOCKED") {
-    body = `Your ${amountLabel} is locked. Refer ${settings.requiredReferrals} verified women to unlock it.`;
-  } else if (reward?.status === "UNLOCKED") {
-    body = `Your ${amountLabel} reward is unlocked. You can withdraw it now.`;
-  } else if (reward?.status === "REQUESTED") {
-    body = `Your ${amountLabel} withdrawal has been requested.`;
+  const faceVerified =
+    user.profile?.verified === true && (user.profile.verifiedSource === "FACE" || user.profile.verifiedSource === "DOJAH");
+  let qualified = 0;
+  if (faceVerified) {
+    const me = await db.user.findUnique({ where: { id: userId }, select: personSelect });
+    const referrals = await referralPeople(userId);
+    qualified = referrals.filter((row) => row.qualified && !(me && sameIdentity(me as Person, row.person))).length;
   }
-  return { show: true as const, title, body, href: "/referrals" };
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com").replace(/\/$/, "");
+  const code = user.referralCode ?? "";
+  return {
+    show: true as const,
+    state: (faceVerified ? "refer" : "verify") as RewardState,
+    title: `${short} Reward`,
+    amountLabel,
+    required: settings.requiredReferrals,
+    qualified: Math.min(qualified, settings.requiredReferrals),
+    rewardStatus: reward?.status ?? null,
+    code,
+    link: code ? `${appUrl}/signup?ref=${code}` : "",
+    pillDismissed: Boolean(user.rewardPillDismissedAt),
+    href: "/referrals",
+  };
+}
+
+export type RewardState = "guest" | "verify" | "refer";
+
+/** What a signed-out visitor sees: the offer and a sign-up prompt. */
+export async function guestRewardNotice() {
+  const [settings, issued] = await Promise.all([campaignSettings(), issuedCount()]);
+  if (!(settings.enabled && issued < settings.participantLimit)) return { show: false as const };
+  const amountLabel = naira(settings.rewardKobo);
+  return {
+    show: true as const,
+    state: "guest" as RewardState,
+    title: `${amountLabel.replace(/,000$/, "k")} Reward`,
+    amountLabel,
+    required: settings.requiredReferrals,
+    qualified: 0,
+    rewardStatus: null,
+    code: "",
+    link: "",
+    pillDismissed: false,
+    href: "/signup",
+  };
 }

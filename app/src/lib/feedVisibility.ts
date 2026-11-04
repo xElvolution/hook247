@@ -4,7 +4,8 @@ import { db } from "./db";
 /** Profile has a photo (avatar or gallery) or a live video/photo post. */
 export const HAS_MEDIA: Prisma.ProfileWhereInput = {
   OR: [
-    { avatarUrl: { not: "" } },
+    // Generated cartoon avatars (dicebear) are not real media.
+    { AND: [{ avatarUrl: { not: "" } }, { NOT: { avatarUrl: { contains: "dicebear" } } }] },
     { photos: { isEmpty: false } },
     {
       user: {
