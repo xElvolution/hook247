@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Camera, ImageUp, Lock, Timer, X } from "lucide-react";
 
 /** Small "Get verified" option that explains the flow in a sheet before starting it. */
-export default function GetVerifiedButton({ className = "" }: { className?: string }) {
+export default function GetVerifiedButton({ className = "", children, ariaLabel }: { className?: string; children?: ReactNode; ariaLabel?: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -18,8 +18,8 @@ export default function GetVerifiedButton({ className = "" }: { className?: stri
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
-        <BadgeCheck className="h-4 w-4" /> Get verified
+      <button type="button" className={className} aria-label={ariaLabel} onClick={() => setOpen(true)}>
+        {children ?? <><BadgeCheck className="h-4 w-4" /> Get verified</>}
       </button>
       {open ? (
         <div className="verify-sheet-backdrop" role="presentation" onClick={() => setOpen(false)}>

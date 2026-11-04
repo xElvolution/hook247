@@ -16,6 +16,7 @@ import {
   Sparkles,
   X,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 import {
   BUILD_OPTIONS,
@@ -156,20 +157,39 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
   return (
     <div className="mx-auto max-w-6xl">
 
-      <div className="section-heading-row mb-6 items-end">
-        <div>
-          <p className="section-kicker">Account</p>
-          <h1 className="font-display mt-1.5 text-xl font-bold">My profile</h1>
+      <div className="profile-hdr mb-6">
+        <div className="profile-hdr-top">
+          <div className="min-w-0">
+            <p className="section-kicker">Account</p>
+            <h1 className="font-display mt-1.5 flex items-center gap-1.5 text-xl font-bold">
+              My profile
+              {profile.verified && (
+                <span className="profile-hdr-verified" title="Verified">
+                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden /> Verified
+                </span>
+              )}
+            </h1>
+          </div>
+          <div className="profile-hdr-actions">
+            <Link href="/feed?compose=1" className="btn-primary !px-3.5 !py-2 text-sm">
+              <Plus className="h-4 w-4" /> Create post
+            </Link>
+            <Link href={`/profiles/${encodeURIComponent(profile.userId)}`} className="profile-hdr-chip" aria-label="Public view">
+              <Eye className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Public view</span>
+            </Link>
+            <LogoutButton compact />
+          </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Link href="/feed?compose=1" className="btn-primary !px-4 !py-2.5 text-sm">
-            <Plus className="h-4 w-4" /> Create post
-          </Link>
-          <Link href={`/profiles/${encodeURIComponent(profile.userId)}`} className="btn-ghost !px-4 !py-2.5 text-sm">
-            <Eye className="h-4 w-4" /> Public view
-          </Link>
-          <LogoutButton />
-        </div>
+        {!profile.verified && (
+          <GetVerifiedButton className="profile-hdr-verify" ariaLabel="Get verified: add a verification badge to your profile">
+            <span className="profile-hdr-verify-icon"><BadgeCheck className="h-4 w-4" aria-hidden /></span>
+            <span className="min-w-0 text-left">
+              <span className="block text-sm font-semibold">Get verified</span>
+              <span className="block text-xs text-muted">Add a verification badge to your profile</span>
+            </span>
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted" aria-hidden />
+          </GetVerifiedButton>
+        )}
       </div>
 
       <div className="public-profile-layout">
@@ -330,9 +350,6 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
         <p className="text-xs text-muted">Signed in as {profile.email}</p>
         <div className="flex flex-wrap gap-2">
-          {!profile.verified && (
-            <GetVerifiedButton className="btn-ghost !px-4 !py-2.5 text-sm" />
-          )}
           {profile.plan === "FREE" && (
             <Link href="/premium" className="btn-primary !px-4 !py-2.5 text-sm">
               <Zap className="h-4 w-4" /> Go Premium
