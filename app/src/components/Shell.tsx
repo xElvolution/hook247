@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import { useRealtimeEvent } from "@/lib/realtimeClient";
 import { AnimatePresence, motion } from "framer-motion";
 import NavSearch from "@/components/NavSearch";
+import WelcomeBanner from "@/components/WelcomeBanner";
 import { InstallAppButton, IosInstallHelp, PwaBanner, usePwaInstall } from "@/components/PwaInstall";
 import {
   CircleHelp,
   Coins,
+  FileText,
   Gift,
   Home,
   Mail,
@@ -50,6 +52,7 @@ const ACCOUNT_MENU: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Premium", href: "/premium", icon: Zap },
   { label: "FAQs", href: "/faqs", icon: CircleHelp },
   { label: "Contact", href: "/contact", icon: Mail },
+  { label: "Legal", href: "/legal", icon: FileText },
 ];
 
 const MEMBER_ONLY = new Set(["/profile", "/matches", "/followers"]);
@@ -313,7 +316,10 @@ export default function Shell({
           </Link>
         </aside>
 
-        <main className="relative min-w-0 flex-1 pb-24 md:pb-6">{children}</main>
+        <main className="relative min-w-0 flex-1 pb-24 md:pb-6">
+          {authed ? <WelcomeBanner /> : null}
+          {children}
+        </main>
       </div>
 
       <PwaBanner canOffer={pwa.canOffer} onInstall={() => void pwa.install()} />

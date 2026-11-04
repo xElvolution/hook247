@@ -72,12 +72,13 @@ export default async function VerificationPage({
                   <span className="text-sm text-muted">{p.user.email}</span>
                   <Badge
                     tone={
-                      p.verifiedSource === VerificationSource.REVIEWED
+                      p.verifiedSource === VerificationSource.REVIEWED ||
+                      p.verifiedSource === VerificationSource.FACE
                         ? "good"
                         : "warn"
                     }
                   >
-                    {p.verifiedSource}
+                    {p.verifiedSource === VerificationSource.FACE ? "FACE MATCH" : p.verifiedSource}
                   </Badge>
                   {p.user.bannedAt ? <Badge tone="bad">Banned</Badge> : null}
                 </div>

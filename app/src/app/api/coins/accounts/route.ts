@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
 import { isMockUserId } from "@/lib/mock";
 import { CoinError } from "@/lib/coins";
-import { listBanks, resolveAccount } from "@/lib/paystack";
+import { KorapayError, listBanks, resolveBankAccount } from "@/lib/korapay";
 import {
   listWithdrawalAccounts,
   removeWithdrawalAccount,
@@ -63,10 +63,15 @@ export async function POST(req: Request) {
   let bankName = "";
   let accountName = "";
   try {
-    const [banks, account] = await Promise.all([listBanks(), resolveAccount(accountNumber, bankCode)]);
+    const [banks, account] = await Promise.all([listBanks(), resolveBankAccount(accountNumber, bankCode)]);
+    // Only banks Korapay can pay out to may be saved.
     bankName = banks.find((b) => b.code === bankCode)?.name ?? "";
     accountName = account.accountName;
-  } catch {
+  } catch (err) {
+    if (err instanceof KorapayError && !err.definitive) {
+      console.error("Korapay account check failed:", err.message);
+      return NextResponse.json({ error: "Account lookup is unavailable right now. Try again shortly." }, { status: 502 });
+    }
     return NextResponse.json({ error: "We could not confirm that bank account. Check the number and bank." }, { status: 422 });
   }
   if (!bankName || !accountName) {

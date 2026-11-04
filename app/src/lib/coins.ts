@@ -171,7 +171,7 @@ async function move<T>(
 // ---------------------------------------------------------------- purchases
 
 /**
- * Credit a paid coin purchase. Safe to call from the Paystack callback, the
+ * Credit a paid coin purchase. Safe to call from the Korapay redirect, the
  * webhook and the admin retry button at once: the purchase row is claimed and
  * the coins credited inside the same transaction, keyed on the reference.
  */
@@ -192,7 +192,7 @@ export async function creditPurchase(reference: string, verifiedAmountKobo: numb
         amount: purchase.coins,
         idempotencyKey: `purchase:${reference}`,
         purchaseId: purchase.id,
-        source: "paystack",
+        source: "korapay",
         note: `${purchase.coins} coins`,
       },
     ],

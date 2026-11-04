@@ -7,7 +7,7 @@ export function canonicalAppUrl() {
 }
 
 /**
- * Origin of the request currently hitting the app. Used for Paystack return
+ * Origin of the request currently hitting the app. Used for Korapay return
  * URLs so checkout still completes when the site is reached via an alternate
  * host (sslip.io while DNS propagates, www, etc.).
  */

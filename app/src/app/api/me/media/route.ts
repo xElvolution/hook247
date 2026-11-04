@@ -36,5 +36,9 @@ export async function PATCH(req: Request) {
     select: { avatarUrl: true, photos: true, clips: true },
   });
 
+  await import("@/lib/welcome").then(({ syncWelcome }) => syncWelcome(userId)).catch((err) => {
+    console.error("Welcome reward update failed:", (err as Error).message);
+  });
+
   return NextResponse.json({ ok: true, ...updated });
 }

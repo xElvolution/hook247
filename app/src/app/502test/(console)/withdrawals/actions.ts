@@ -16,6 +16,10 @@ export async function setWithdrawal(form: FormData) {
     where: { id },
     data: { status, adminNote, resolvedAt: new Date() },
   });
+  if (status === "PAID" || status === "REJECTED") {
+    const { settleWelcomeWithdrawal } = await import("@/lib/welcome");
+    await settleWelcomeWithdrawal(id, status);
+  }
   await logAdminAction("withdrawal.update", "withdrawal", id, status);
   revalidatePath("/502test/withdrawals");
 }

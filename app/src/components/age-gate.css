@@ -103,6 +103,12 @@
   outline-offset: 2px;
 }
 
+.age-gate-note a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .age-gate-note {
   color: var(--color-muted);
   font-size: 0.72rem;

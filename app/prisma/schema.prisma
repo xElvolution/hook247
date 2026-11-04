@@ -84,12 +84,14 @@ enum ReportTarget {
 
 /// Why a profile carries the verified badge. PAID is the legacy path where
 /// paying set the badge outright; REVIEWED means a human approved it; DOJAH
-/// means a real NIN + selfie-liveness KYC check passed via the Dojah widget.
+/// is the retired NIN + selfie check (kept so old rows still read); FACE means
+/// the member passed the in-app live face check against their uploaded photo.
 enum VerificationSource {
   NONE
   PAID
   REVIEWED
   DOJAH
+  FACE
 }
 
 model User {
@@ -149,6 +151,11 @@ model User {
   giftingDisabled Boolean @default(false)
   /// Admin switch: withdrawals are refused and pending ones cannot be approved.
   payoutsFrozen   Boolean @default(false)
+  /// Set once the welcome-reward email has been sent, so login does not send it again.
+  welcomeNotifiedAt  DateTime?
+
+  welcomeReward       WelcomeReward?
+  memberVerification  MemberVerification?
 
   @@index([bannedAt])
   @@index([createdAt])
@@ -358,8 +365,9 @@ model EmailVerification {
   @@index([expiresAt])
 }
 
-/// One row per Paystack checkout. `reference` is what we send to Paystack and
-/// what the webhook echoes back, so it is the idempotency key for fulfilment.
+/// One row per checkout. `reference` is what we send to the payment provider
+/// (Korapay) and what its webhook echoes back, so it is the idempotency key
+/// for fulfilment.
 model Payment {
   id          String         @id @default(cuid())
   userId      String
@@ -447,6 +455,8 @@ model Withdrawal {
   accountNumber String
   bankName      String
   adminNote     String           @default("")
+  /// commission (plan referral) or welcome (₦ welcome reward).
+  purpose       String           @default("commission")
   createdAt     DateTime         @default(now())
   resolvedAt    DateTime?
 
@@ -584,7 +594,7 @@ model CoinTransaction {
   type           CoinTxType
   amount         Int
   balanceAfter   Int
-  /// Unique key that makes retries safe (Paystack reference, tip nonce...).
+  /// Unique key that makes retries safe (payment reference, tip nonce...).
   idempotencyKey String?    @unique
   counterpartyId String?
   postId         String?
@@ -615,7 +625,7 @@ model CoinPack {
   createdAt DateTime @default(now())
 }
 
-/// One row per coin checkout. `reference` is what Paystack echoes back, so it
+/// One row per coin checkout. `reference` is what Korapay echoes back, so it
 /// is the idempotency key for crediting coins.
 model CoinPurchase {
   id         String        @id @default(cuid())
@@ -641,8 +651,10 @@ model CoinSettings {
   payoutKoboPerCoin        Int      @default(750)
   /// Legacy (v1) minimum withdrawal in coins. Unused since earnings are naira.
   minWithdrawalCoins       Int      @default(1000)
-  /// Only switch on once Paystack Transfers are enabled on the account.
-  paystackTransfersEnabled Boolean  @default(false)
+  /// Pay withdrawals automatically through the payment provider (Korapay
+  /// payouts). Only switch on once payouts are enabled on the Korapay account.
+  /// Mapped to the old column name so no migration is needed.
+  bankTransfersEnabled     Boolean  @default(false) @map("paystackTransfersEnabled")
   /// What one coin costs the buyer, in kobo. Fixed at N50.
   coinPriceKobo            Int      @default(5000)
   /// Escort share of every gift, in percent. The platform keeps the rest.
@@ -677,7 +689,10 @@ model CoinWithdrawal {
   bankName        String
   accountNumber   String
   accountName     String
+  /// Provider payout reference while a payout is in flight or once paid
+  /// (`f247pay_...` for Korapay, `h247payout_...` for old Paystack transfers).
   payoutReference String           @default("")
+  /// Set once the provider has accepted the payout (Korapay: its reference).
   transferCode    String           @default("")
   adminNote       String           @default("")
   createdAt       DateTime         @default(now())
@@ -695,6 +710,7 @@ model PayoutAccount {
   bankName      String
   accountNumber String
   accountName   String
+  /// Paystack transfer recipient from before the Korapay switch. Unused.
   recipientCode String   @default("")
   updatedAt     DateTime @updatedAt
 
@@ -881,6 +897,7 @@ model WithdrawalAccount {
   bankName      String
   accountNumber String
   accountName   String
+  /// Paystack transfer recipient from before the Korapay switch. Unused.
   recipientCode String   @default("")
   isDefault     Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -890,4 +907,106 @@ model WithdrawalAccount {
 
   @@unique([userId, bankCode, accountNumber])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------- welcome reward campaign
+
+enum WelcomeRewardStatus {
+  LOCKED
+  UNLOCKED
+  REQUESTED
+  WITHDRAWN
+  VOID
+}
+
+enum CheckState {
+  PENDING
+  PASSED
+  FAILED
+}
+
+/// Admin-editable campaign rules. One row, id "default".
+model WelcomeCampaign {
+  id                 String   @id @default("default")
+  enabled            Boolean  @default(true)
+  participantLimit   Int      @default(20)
+  rewardKobo         Int      @default(500000)
+  requiredReferrals  Int      @default(2)
+  updatedAt          DateTime @updatedAt
+}
+
+/// Issued only after every verification step passes. Not withdrawable until unlocked.
+model WelcomeReward {
+  id           String              @id @default(cuid())
+  userId       String              @unique
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountKobo   Int
+  status       WelcomeRewardStatus @default(LOCKED)
+  /// Order among issued rewards. VOID rows do not count toward the cap.
+  slot         Int                 @default(0)
+  issuedAt     DateTime            @default(now())
+  unlockedAt   DateTime?
+  withdrawnAt  DateTime?
+
+  @@index([status, issuedAt])
+}
+
+/// Verification progress. Phone (and legacy NIN) are stored only as hashes, never in the clear.
+model MemberVerification {
+  userId              String     @id
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneHash           String?    @unique
+  phoneLast4          String     @default("")
+  phoneState          CheckState @default(PENDING)
+  phoneVerifiedAt     DateTime?
+  ninHash             String?    @unique
+  ninState            CheckState @default(PENDING)
+  ninVerifiedAt       DateTime?
+  livenessState       CheckState @default(PENDING)
+  livenessVerifiedAt  DateTime?
+  /// Face verification: reference photo the live selfie is matched against.
+  faceRefUrl          String     @default("")
+  /// true = the reference photo is also shown on the profile; false = verification only.
+  faceRefPublic       Boolean    @default(false)
+  /// Best match score (0..1) of the last attempt, and attempt bookkeeping.
+  faceScore           Float?
+  faceAttempts        Int        @default(0)
+  faceLastAttemptAt   DateTime?
+  faceLastError       String     @default("")
+  /// Short-lived server-issued liveness challenge (random head-turn order).
+  faceChallenge       String     @default("")
+  faceChallengeAt     DateTime?
+  otpReference        String     @default("")
+  otpPhoneHash        String     @default("")
+  otpExpiresAt        DateTime?
+  otpAttempts         Int        @default(0)
+  updatedAt           DateTime   @updatedAt
+}
+
+/// Admin can refuse a referred account so it does not count toward the welcome reward.
+model WelcomeReferralFlag {
+  id         String   @id @default(cuid())
+  referrerId String
+  referredId String   @unique
+  rejected   Boolean  @default(false)
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([referrerId])
+}
+
+/// A plan or boost an admin offered. It is applied only after the member opens the claim link.
+model BonusClaim {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  kind      String
+  days      Int       @default(0)
+  hours     Int       @default(0)
+  planSlug  String    @default("")
+  label     String    @default("")
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, claimedAt])
 }

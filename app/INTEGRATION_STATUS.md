@@ -1,5 +1,11 @@
 # Production Integration Status
 
+> **Payments moved from Paystack to Korapay.** Pay-ins use Korapay Checkout
+> Redirect, payouts use Korapay bank disbursements (`src/lib/korapay.ts`).
+> Webhook: `/api/webhooks/korapay` (alias `/api/korapay/webhook`), verified with
+> `x-korapay-signature` (HMAC-SHA256 of the `data` object). Older Paystack notes
+> below are kept as history.
+
 ## ✅ Completed
 
 ### Bugs found and fixed in final review
@@ -33,10 +39,12 @@
   - Match notifications
   - Payment receipts
   - 10-minute code expiry, rate-limited to 5 codes per 15 min per address
-- **Payment integration** — Paystack live keys with webhook (`src/lib/paystack.ts`)
-  - Signature verification (HMAC-SHA512)
+- **Payment integration** — Korapay live keys with webhook (`src/lib/korapay.ts`)
+  - Signature verification (HMAC-SHA256 of the webhook `data` object)
+  - Every event re-verified against the Korapay API before value is given
   - Idempotent fulfillment keyed on `reference`
-  - Webhook route: `/api/webhooks/paystack`
+  - Webhook route: `/api/webhooks/korapay`
+  - Escort payouts through Korapay disbursements, settled by `transfer.*` webhooks or a status check
 - **Session auth** — JWT with bcrypt, stored in HTTP-only cookies
 
 ### API Routes (Production-Only)
@@ -45,15 +53,15 @@ All demo fallbacks removed. Every route reads from Postgres:
 - `/api/auth/login` — checks credentials, returns session
 - `/api/verify-email` — send/verify 6-digit codes
 - `/api/reset-password` — request/consume password-reset codes
-- `/api/premium` — Paystack checkout (POST), public key (GET)
-- `/api/webhooks/paystack` — fulfills payments on `charge.success`
+- `/api/premium` — Korapay checkout (POST)
+- `/api/webhooks/korapay` — fulfils payments on `charge.success`, settles payouts on `transfer.success` / `transfer.failed`
 - `/api/swipe` — creates matches, sends match emails
 - `/api/discover`, `/api/browse`, `/api/feed`, `/api/live` — no demo data
 
 ### Pages
 - `/verify-email` — 6-digit code entry with resend + skip
 - `/forgot-password` — two-step: request code → reset password
-- `/premium` — real Paystack checkout (server reads `searchParams` prop to avoid Suspense issues)
+- `/premium` — real Korapay checkout (server reads `searchParams` prop to avoid Suspense issues)
 - Login page links to `/forgot-password`
 - Signup → onboarding → verify-email flow
 
@@ -63,7 +71,7 @@ All demo fallbacks removed. Every route reads from Postgres:
 - State/city fields populated from `LOCATION_DATA` constants
 
 ### Configuration
-- `.env` — documented with Neon pooler note, Hostinger SMTP, Paystack live keys
+- `.env` — documented with Neon pooler note, Hostinger SMTP, Korapay live keys (old PAYSTACK_* lines unused)
 - `.env.example` — template for deployment
 - `README.md` — setup guide, pricing table, deployment checklist
 
@@ -133,7 +141,7 @@ There is no `/messages` route — chat lives at `/matches/[matchId]`.
 
 - [ ] Provide `EMAIL_PASSWORD` (the only thing still blocking a feature)
 - [ ] Rotate the Neon password and set a real `AUTH_SECRET`
-- [ ] Register webhook in Paystack dashboard: `<NEXT_PUBLIC_APP_URL>/api/webhooks/paystack`
+- [ ] Set the webhook in the Korapay dashboard: `https://<app host>/api/webhooks/korapay`
 - [ ] Expose webhook endpoint (ngrok/Cloudflare Tunnel for local testing, or deploy)
 - [ ] Set production `NEXT_PUBLIC_APP_URL` so payment callbacks and email links resolve
 - [ ] Move uploads off ephemeral local disk (S3/Cloudinary) — they vanish on redeploy
@@ -150,7 +158,7 @@ There is no `/messages` route — chat lives at `/matches/[matchId]`.
 - **Chat** — 4s polling, not realtime
 - **Verification** — paying ₦2,000 sets the badge; no ID/selfie check yet
 
-## Files Changed (This Session)
+## Files Changed (Earlier Session, Paystack Era)
 
 **Bug fixes:**
 - `src/lib/verification.ts` — rate-limit now works (expire old codes instead of deleting them)

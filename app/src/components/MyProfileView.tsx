@@ -159,10 +159,10 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
           <div>
             <p className="verify-banner-kicker">No verified badge yet</p>
             <p className="verify-banner-copy">
-              Get verified so clients can trust this profile. The badge shows on your photos, cards, and public page.
+              Verify your face in under a minute so clients can trust this profile. The badge shows on your photos, cards, and public page.
             </p>
           </div>
-          <Link href="/premium" className="btn-primary shrink-0 text-sm">
+          <Link href="/verify" className="btn-primary shrink-0 text-sm">
             <BadgeCheck className="h-4 w-4" /> Get verified
           </Link>
         </div>
@@ -188,7 +188,7 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
         <section className="public-profile-gallery" aria-label="My profile photo">
           <div className="public-profile-photo public-profile-photo-main">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-cover" />
+            <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-contain" />
             <button type="button" className="edit-chip" onClick={() => setOpen("photos")}>
               <Pencil className="h-3.5 w-3.5" /> Edit photos
             </button>
@@ -343,7 +343,7 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
         <p className="text-xs text-muted">Signed in as {profile.email}</p>
         <div className="flex flex-wrap gap-2">
           {!profile.verified && (
-            <Link href="/premium" className="btn-ghost !px-4 !py-2.5 text-sm">
+            <Link href="/verify" className="btn-ghost !px-4 !py-2.5 text-sm">
               <BadgeCheck className="h-4 w-4" /> Get verified
             </Link>
           )}

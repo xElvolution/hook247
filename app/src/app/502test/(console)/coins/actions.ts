@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { requireAdmin, logAdminAction } from "@/lib/adminSession";
 import { adminAdjust, CoinError, coinPrice, getCoinSettings } from "@/lib/coins";
 import { approveWithdrawal, markPayoutPaid, rejectPayout, runLegacyConversion } from "@/lib/earnings";
-import { payWithdrawalViaPaystack } from "@/lib/coinPayouts";
+import { isKorapayPayoutReference, payWithdrawalViaKorapay, syncPayoutStatus } from "@/lib/coinPayouts";
 import { fulfilCoinPurchase } from "@/lib/coinPurchases";
 
 function back(path: string, message: string, tone: "ok" | "error" = "ok"): never {
@@ -21,7 +21,7 @@ export async function saveCoinSettings(formData: FormData) {
   const feePct = Number(String(formData.get("feePct") ?? "").replace(/[^\d.]/g, ""));
   const withdrawalFeeBps = Math.round(feePct * 100);
   const manualWithdrawalApproval = formData.get("manualWithdrawalApproval") === "on";
-  const paystackTransfersEnabled = formData.get("paystackTransfersEnabled") === "on";
+  const bankTransfersEnabled = formData.get("bankTransfersEnabled") === "on";
   if (!Number.isFinite(escortSharePct) || escortSharePct < 1 || escortSharePct > 100) {
     back("/502test/coins", "Escort share must be between 1% and 100%", "error");
   }
@@ -31,13 +31,13 @@ export async function saveCoinSettings(formData: FormData) {
   await getCoinSettings();
   await db.coinSettings.update({
     where: { id: "default" },
-    data: { escortSharePct, withdrawalFeeBps, manualWithdrawalApproval, paystackTransfersEnabled },
+    data: { escortSharePct, withdrawalFeeBps, manualWithdrawalApproval, bankTransfersEnabled },
   });
   await logAdminAction(
     "coins.settings",
     "coins",
     "default",
-    `split ${escortSharePct}/${100 - escortSharePct}, fee ${withdrawalFeeBps}bps, manual ${manualWithdrawalApproval ? "on" : "off"}, transfers ${paystackTransfersEnabled ? "on" : "off"}`
+    `split ${escortSharePct}/${100 - escortSharePct}, fee ${withdrawalFeeBps}bps, manual ${manualWithdrawalApproval ? "on" : "off"}, Korapay payouts ${bankTransfersEnabled ? "on" : "off"}`
   );
   revalidatePath("/502test/coins");
   back("/502test/coins", "Coin settings saved");
@@ -118,6 +118,7 @@ export async function payoutMarkPaid(formData: FormData) {
   const reference = String(formData.get("reference") ?? "").trim().slice(0, 120);
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (!reference) back("/502test/coin-payouts", "Enter the bank transfer reference", "error");
+  await blockIfKorapayInFlight(id);
   try {
     await markPayoutPaid(id, reference, note);
   } catch (err) {
@@ -134,6 +135,7 @@ export async function payoutReject(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (!note) back("/502test/coin-payouts", "Say why the withdrawal is rejected", "error");
+  await blockIfKorapayInFlight(id);
   try {
     await rejectPayout(id, note);
   } catch (err) {
@@ -160,25 +162,56 @@ export async function payoutApprove(formData: FormData) {
   back("/502test/coin-payouts", "Approved. Send the money, then mark it paid with the reference.");
 }
 
-export async function payoutViaPaystack(formData: FormData) {
+const PAYOUT_MESSAGES: Record<string, string> = {
+  paid: "Korapay payout sent and marked paid",
+  processing: "Korapay is processing the payout. It completes when Korapay confirms it (webhook or Check status).",
+  unconfirmed: "Korapay did not answer clearly. The payout stays locked; use Check status before doing anything else.",
+  refunded: "Korapay reported the payout failed, so the amount went back to the escort",
+  released: "Korapay has no record of that attempt, so the request is unlocked and can be paid again",
+  "needs-review": "Korapay and the app disagree about this payout. Check the Korapay dashboard and the server log.",
+  already: "This withdrawal was already settled",
+};
+
+export async function payoutViaKorapay(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  let state = "";
+  let result: { state: string; reference: string } = { state: "", reference: "" };
   try {
-    state = (await payWithdrawalViaPaystack(id)).state;
+    result = await payWithdrawalViaKorapay(id);
   } catch (err) {
     if (err instanceof CoinError) back("/502test/coin-payouts", err.message, "error");
     throw err;
   }
-  await logAdminAction("coins.payout.transfer", "coinWithdrawal", id, state);
+  await logAdminAction("coins.payout.transfer", "coinWithdrawal", id, `${result.state} ${result.reference}`);
   revalidatePath("/502test/coin-payouts");
-  back(
-    "/502test/coin-payouts",
-    state === "paid" ? "Paystack transfer sent and marked paid" : `Paystack transfer is ${state}. It completes when Paystack confirms it.`
-  );
+  back("/502test/coin-payouts", PAYOUT_MESSAGES[result.state] ?? `Korapay payout is ${result.state}`, result.state === "needs-review" ? "error" : "ok");
 }
 
-/** Ask Paystack again about a purchase whose webhook never arrived. Safe to repeat. */
+/** Ask Korapay for the status of an in-flight payout. Safe to repeat. */
+export async function payoutCheckStatus(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  let state = "";
+  try {
+    state = await syncPayoutStatus(id);
+  } catch (err) {
+    if (err instanceof CoinError) back("/502test/coin-payouts", err.message, "error");
+    throw err;
+  }
+  await logAdminAction("coins.payout.check", "coinWithdrawal", id, state);
+  revalidatePath("/502test/coin-payouts");
+  back("/502test/coin-payouts", PAYOUT_MESSAGES[state] ?? `Korapay payout is ${state}`, state === "needs-review" ? "error" : "ok");
+}
+
+/** Manual paid/reject must not race a payout Korapay is still handling. */
+async function blockIfKorapayInFlight(id: string) {
+  const w = await db.coinWithdrawal.findUnique({ where: { id }, select: { status: true, payoutReference: true } });
+  if (w && (w.status === "REQUESTED" || w.status === "APPROVED") && isKorapayPayoutReference(w.payoutReference)) {
+    back("/502test/coin-payouts", "A Korapay payout is in flight for this request. Use Check status; it settles from Korapay's answer.", "error");
+  }
+}
+
+/** Ask Korapay again about a purchase whose webhook never arrived. Safe to repeat. */
 export async function recheckPurchase(formData: FormData) {
   await requireAdmin();
   const reference = String(formData.get("reference") ?? "");
@@ -188,7 +221,7 @@ export async function recheckPurchase(formData: FormData) {
   revalidatePath("/502test/coins");
   back(
     "/502test/coins",
-    result.ok ? `Purchase ${result.state === "credited" ? "credited" : "was already credited"}` : `Paystack says: ${result.error}`,
+    result.ok ? `Purchase ${result.state === "credited" ? "credited" : "was already credited"}` : `Korapay says: ${result.error}`,
     result.ok ? "ok" : "error"
   );
 }

@@ -36,6 +36,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { href: "/502test/earnings", label: "Earnings" },
       { href: "/502test/coin-payouts", label: "Earnings payouts", badgeKey: "coinPayouts" },
       { href: "/502test/finance", label: "Finance" },
+      { href: "/502test/campaign", label: "Welcome reward" },
     ],
   },
   {

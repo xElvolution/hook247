@@ -227,5 +227,9 @@ export async function POST(req: Request) {
     });
   }
 
+  await import("@/lib/welcome").then(({ syncWelcome }) => syncWelcome(userId)).catch((err) => {
+    console.error("Welcome reward update failed:", (err as Error).message);
+  });
+
   return NextResponse.json({ ok: true, profile });
 }

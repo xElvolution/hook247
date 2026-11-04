@@ -12,7 +12,7 @@ const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 const LEAVE_URL = "https://www.google.com";
 
 // The admin console is already hidden behind its own gate.
-const SKIP_PREFIXES = ["/502test"];
+const SKIP_PREFIXES = ["/502test", "/legal", "/terms", "/privacy", "/cookies", "/guidelines", "/payments-policy", "/contact", "/faqs"];
 
 // useLayoutEffect warns during SSR; fall back to useEffect there.
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -173,7 +173,14 @@ export default function AgeGate() {
             Leave site
           </button>
         </div>
-        <p className="age-gate-note">We will remember your choice on this device for 30 days.</p>
+        <p className="age-gate-note">
+          We will remember your choice on this device for 30 days using an essential cookie.{" "}
+          <a href="/cookies">Cookie Policy</a>
+          {" · "}
+          <a href="/terms">Terms</a>
+          {" · "}
+          <a href="/privacy">Privacy</a>
+        </p>
       </div>
     </div>,
     document.body

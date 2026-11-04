@@ -129,7 +129,7 @@ export default function ProfileMedia({
       <div className="mt-6 grid gap-4 sm:grid-cols-[180px_1fr]">
         <label className="relative block aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl border border-line bg-black/30">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+          <img src={avatar} alt="Profile" className="h-full w-full object-contain" />
           <span className="absolute inset-x-0 bottom-0 bg-black/55 px-3 py-2 text-center text-xs">
             Change picture
           </span>
@@ -170,7 +170,7 @@ export default function ProfileMedia({
                 <div key={url} className="min-w-0">
                   <div className="aspect-square overflow-hidden rounded-xl bg-black/30">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    <img src={url} alt="" className="h-full w-full object-contain" />
                   </div>
                   <button
                     type="button"
@@ -207,7 +207,7 @@ export default function ProfileMedia({
               {videos.map((url) => (
                 <div key={url} className="min-w-0">
                   <div className="overflow-hidden rounded-xl bg-black/30">
-                    <video src={url} className="aspect-video w-full object-cover" muted playsInline />
+                    <video src={url} className="max-h-80 w-full object-contain" muted playsInline />
                   </div>
                   <button
                     type="button"

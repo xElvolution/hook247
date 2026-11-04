@@ -7,8 +7,8 @@
  *
  * It creates a throwaway account, exercises auth/onboarding/discovery/social/
  * payments/report/moderation/admin, then cleans up everything it created and
- * restores anything it toggled. Live Paystack: it starts one checkout (no
- * charge — same as opening then closing the pay page) and voids the row after.
+ * restores anything it toggled. Payments: no live Korapay charge is created;
+ * the webhook is tested with signed fake events.
  */
 import { PrismaClient } from "@prisma/client";
 import { SignJWT } from "jose";
@@ -339,56 +339,55 @@ async function main() {
   }
 
   // ── 4. Payments ────────────────────────────────────────────────────────────
-  section("Payments (Paystack LIVE — no charge)");
+  section("Payments (Korapay webhook — no charge)");
   {
-    const pk = await req("premium-key", "GET", "/api/premium", { jarName: "demo" });
-    ok("premium returns public key", pk.status === 200 && /^pk_/.test(pk.json?.publicKey ?? ""), JSON.stringify(pk.json));
-
     const bad = await req("premium-bad", "POST", "/api/premium", { jarName: "demo", body: { action: "checkout", purpose: "NONSENSE" } });
-    ok("bad purpose rejected 400", bad.status === 400);
+    ok("bad checkout input rejected 400", bad.status === 400);
 
-    // One real init to prove Paystack integration. Creates a PENDING row +
-    // Paystack transaction; no money moves until a card is entered. Voided below.
-    const checkout = await req("premium-checkout", "POST", "/api/premium", {
-      jarName: "demo",
-      body: { action: "checkout", purpose: "PLAN_PLUS" },
-    });
-    ok("checkout returns Paystack URL", checkout.status === 200 && /paystack/.test(checkout.json?.checkoutUrl ?? ""), JSON.stringify(checkout.json).slice(0, 160));
-    if (checkout.json?.reference) created.paymentRefs.push(checkout.json.reference);
-
-    // Webhook signature enforcement
-    const noSig = await req("wh-nosig", "POST", "/api/webhooks/paystack", { jarName: "demo", body: { event: "charge.success" } });
+    // No real checkout is started: initialising a Korapay charge creates a
+    // live transaction. The webhook is exercised with signed fake events.
+    const noSig = await req("wh-nosig", "POST", "/api/webhooks/korapay", { jarName: "demo", body: { event: "charge.success", data: { reference: "x" } } });
     ok("webhook without signature 401", noSig.status === 401);
 
-    const badSig = await req("wh-badsig", "POST", "/api/webhooks/paystack", {
+    const badSig = await req("wh-badsig", "POST", "/api/webhooks/korapay", {
       jarName: "demo", body: { event: "charge.success", data: { reference: "x" } },
-      headers: { "x-paystack-signature": "deadbeef" },
+      headers: { "x-korapay-signature": "deadbeef" },
     });
     ok("webhook bad signature 401", badSig.status === 401);
 
+    // Korapay signs HMAC-SHA256 of JSON.stringify(data) with the secret key.
+    const secret = process.env.KORAPAY_SECRET_KEY ?? "";
+    const signed = (body) => crypto.createHmac("sha256", secret).update(JSON.stringify(body.data)).digest("hex");
+
     // Valid signature over an unknown reference → accepted, treated as unknown.
-    // Send the exact signed bytes, so bypass the JSON helper's re-stringify.
-    const secret = process.env.PAYSTACK_SECRET_KEY ?? "";
-    const payload = JSON.stringify({ event: "charge.success", data: { reference: `unknown_${STAMP}` } });
-    const sig = crypto.createHmac("sha512", secret).update(payload).digest("hex");
-    const rawRes = await fetch(`${BASE}/api/webhooks/paystack`, {
+    const body = { event: "charge.success", data: { reference: `unknown_${STAMP}`, amount: 100, currency: "NGN", status: "success" } };
+    const rawRes = await fetch(`${BASE}/api/webhooks/korapay`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-paystack-signature": sig },
-      body: payload,
+      headers: { "content-type": "application/json", "x-korapay-signature": signed(body) },
+      body: JSON.stringify(body),
     });
     const rawJson = await rawRes.json().catch(() => null);
     ok("valid signature accepted (unknown ref)", rawRes.status === 200 && rawJson?.unknown, JSON.stringify(rawJson));
 
-    // Non-charge events are acknowledged and ignored.
-    const evtPayload = JSON.stringify({ event: "transfer.success", data: {} });
-    const evtSig = crypto.createHmac("sha512", secret).update(evtPayload).digest("hex");
-    const evtRes = await fetch(`${BASE}/api/webhooks/paystack`, {
+    // Unknown payout references are acknowledged without touching anything.
+    const evt = { event: "transfer.success", data: { reference: `unknown_${STAMP}`, amount: 100, currency: "NGN", status: "success" } };
+    const evtRes = await fetch(`${BASE}/api/webhooks/korapay`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-paystack-signature": evtSig },
-      body: evtPayload,
+      headers: { "content-type": "application/json", "x-korapay-signature": signed(evt) },
+      body: JSON.stringify(evt),
     });
     const evtJson = await evtRes.json().catch(() => null);
-    ok("non-charge event ignored", evtRes.status === 200 && evtJson?.ignored === "transfer.success", JSON.stringify(evtJson));
+    ok("unknown payout reference ignored", evtRes.status === 200 && evtJson?.state === "unknown", JSON.stringify(evtJson));
+
+    // Other events are acknowledged and ignored.
+    const other = { event: "refund.success", data: { reference: `unknown_${STAMP}` } };
+    const otherRes = await fetch(`${BASE}/api/webhooks/korapay`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-korapay-signature": signed(other) },
+      body: JSON.stringify(other),
+    });
+    const otherJson = await otherRes.json().catch(() => null);
+    ok("other event ignored", otherRes.status === 200 && otherJson?.ignored === "refund.success", JSON.stringify(otherJson));
   }
 
   // ── 5. Report + moderation enforcement ─────────────────────────────────────

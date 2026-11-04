@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Loader2, Zap } from "lucide-react";
-import DojahVerify from "./DojahVerify";
+import VerifyCard from "./VerifyCard";
 import { formatKobo } from "@/lib/profileOptions";
 
 type Plan = {
@@ -24,7 +24,6 @@ export default function PremiumPlans({
   paymentPending,
   paymentComplete,
   subscriptionLabel,
-  dojah,
 }: {
   userId: string;
   currentPlan: "FREE" | "PLUS" | "ELITE";
@@ -32,7 +31,6 @@ export default function PremiumPlans({
   paymentPending: boolean;
   paymentComplete: boolean;
   subscriptionLabel: string;
-  dojah: { appId: string; publicKey: string; widgetId: string };
 }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [boosts, setBoosts] = useState<Boost[]>([]);
@@ -143,7 +141,7 @@ export default function PremiumPlans({
       ))}
 
       <div className="mt-8">
-        <DojahVerify userId={userId} verified={verified} appId={dojah.appId} publicKey={dojah.publicKey} widgetId={dojah.widgetId} />
+        <VerifyCard verified={verified} />
       </div>
     </div>
   );

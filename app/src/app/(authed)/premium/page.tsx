@@ -3,7 +3,6 @@ import PremiumPlans from "@/components/PremiumPlans";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
 import { fulfilPayment } from "@/lib/fulfilPayment";
-import { publicWidgetConfig } from "@/lib/dojah";
 import { isMockUserId, mockCurrentUser } from "@/lib/mock";
 
 export const metadata = { title: "Premium | Flirta247" };
@@ -45,7 +44,6 @@ export default async function PremiumPage({
         paymentPending={false}
         paymentComplete={false}
         subscriptionLabel=""
-        dojah={publicWidgetConfig()}
       />
     );
   }
@@ -73,7 +71,6 @@ export default async function PremiumPage({
         paymentPending={paidReturn && !justPaid}
         paymentComplete={justPaid || Boolean(active && paidReturn)}
         subscriptionLabel={subscriptionLabel}
-        dojah={publicWidgetConfig()}
       />
     );
   } catch (err) {
@@ -86,7 +83,6 @@ export default async function PremiumPage({
         paymentPending={paidReturn && !justPaid}
         paymentComplete={justPaid}
         subscriptionLabel={justPaid ? "Payment received. Your profile is updating." : "Pay to activate your profile."}
-        dojah={publicWidgetConfig()}
       />
     );
   }

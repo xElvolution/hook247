@@ -134,8 +134,12 @@ export default function SignupPage() {
             onChange={(e) => setAgreed(e.target.checked)}
             className="mt-0.5 h-4 w-4 accent-[#ff2d78]"
           />
-          I confirm I am 18 years or older and agree to keep Flirta247 respectful
-          and safe.
+          <span>
+            I confirm I am 18 years or older and agree to the{" "}
+            <Link href="/terms" className="underline">Terms of Service</Link>,{" "}
+            <Link href="/privacy" className="underline">Privacy Policy</Link> and{" "}
+            <Link href="/guidelines" className="underline">Community &amp; Safety Guidelines</Link>.
+          </span>
         </label>
 
         {error && (

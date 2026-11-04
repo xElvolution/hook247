@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plan } from "@prisma/client";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/lib/db";
+import { nairaFromKobo } from "@/lib/money";
 import { Panel, Badge, AdminBtn } from "@/components/admin/Ui";
+import GrantPicker from "@/components/admin/GrantPicker";
 import {
   banUser,
   unbanUser,
   suspendUser,
   setGiftingDisabled,
   setPayoutsFrozen,
-  setPlan,
   grantSubscription,
   grantBoost,
   hideProfile,
@@ -35,10 +35,17 @@ function when(date: Date | null | undefined) {
 
 export default async function UserEditPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ userId: string }>;
+  searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
   const { userId } = await params;
+  const flash = await searchParams;
+  const [plans, boosts] = await Promise.all([
+    db.subscriptionPlan.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    db.boostProduct.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+  ]);
   const user = await db.user.findUnique({
     where: { id: userId },
     include: {
@@ -94,60 +101,23 @@ export default async function UserEditPage({
       <div className="grid gap-4 lg:grid-cols-2">
         {p ? (
           <Panel title="Plan">
+            {flash.sent ? <p className="mb-2 text-sm text-emerald-300">{flash.sent}</p> : null}
+            {flash.error ? <p className="mb-2 text-sm text-red-300">{flash.error}</p> : null}
             <p className="text-sm text-muted">
               {paid
-                ? `Live until ${when(p.subscriptionExpiresAt)}`
-                : "No active plan. Grant days to put this profile on the board."}
+                ? `Listed until ${when(p.subscriptionExpiresAt)}`
+                : "No active plan."}
+              {boosted ? ` Boosted until ${when(p.boostedUntil)}.` : " No active boost."}
             </p>
-            <form action={grantSubscription} className="mt-3 flex flex-wrap items-end gap-2">
-              <input type="hidden" name="userId" value={user.id} />
-              <label className="text-xs text-muted">
-                Days
-                <input
-                  name="days"
-                  type="number"
-                  min={1}
-                  max={365}
-                  defaultValue={30}
-                  className="input mt-1 w-24"
-                />
-              </label>
-              <AdminBtn tone="good">Grant days</AdminBtn>
-            </form>
-            <form action={setPlan} className="mt-3 flex flex-wrap items-end gap-2">
-              <input type="hidden" name="userId" value={user.id} />
-              <label className="text-xs text-muted">
-                Plan label
-                <select name="plan" defaultValue={p.plan} className="input mt-1">
-                  {Object.values(Plan).map((plan) => (
-                    <option key={plan} value={plan}>{plan}</option>
-                  ))}
-                </select>
-              </label>
-              <AdminBtn>Save plan label</AdminBtn>
-            </form>
-          </Panel>
-        ) : null}
-
-        {p ? (
-          <Panel title="Boost">
-            <p className="text-sm text-muted">
-              {boosted ? `Boosted until ${when(p.boostedUntil)}` : "No active boost."}
-            </p>
-            <form action={grantBoost} className="mt-3 flex flex-wrap items-end gap-2">
-              <input type="hidden" name="userId" value={user.id} />
-              <label className="text-xs text-muted">
-                Hours
-                <input
-                  name="hours"
-                  type="number"
-                  min={1}
-                  defaultValue={168}
-                  className="input mt-1 w-24"
-                />
-              </label>
-              <AdminBtn>Grant boost</AdminBtn>
-            </form>
+            <div className="mt-3">
+              <GrantPicker
+                userId={user.id}
+                plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceLabel: nairaFromKobo(plan.priceKobo) }))}
+                boosts={boosts.map((boost) => ({ id: boost.id, name: boost.name, priceLabel: nairaFromKobo(boost.priceKobo) }))}
+                grantPlan={grantSubscription}
+                grantBoost={grantBoost}
+              />
+            </div>
           </Panel>
         ) : null}
 

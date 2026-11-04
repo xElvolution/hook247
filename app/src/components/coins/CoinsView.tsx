@@ -135,7 +135,7 @@ export default function CoinsView({ returnReference }: { returnReference: string
     void load();
   }, [load]);
 
-  // Back from Paystack: confirm the payment, retrying briefly while Paystack settles.
+  // Back from Korapay: confirm the payment, retrying briefly while Korapay settles.
   useEffect(() => {
     if (!returnReference) return;
     let cancelled = false;
@@ -155,7 +155,7 @@ export default function CoinsView({ returnReference }: { returnReference: string
           setError(body.error ?? "That payment did not go through, so no coins were added.");
           break;
         }
-        if (attempt === 4) setNotice("Payment is still being confirmed. Your coins will appear here as soon as Paystack confirms it.");
+        if (attempt === 4) setNotice("Payment is still being confirmed. Your coins will appear here as soon as Korapay confirms it.");
         await new Promise((r) => setTimeout(r, 2500));
       }
       if (!cancelled) {
@@ -262,7 +262,7 @@ function ClientWallet({ data, flashes, onError }: { data: ClientData; flashes: R
         <>
           <h2 id="buy-coins" className="font-display mt-6 scroll-mt-24 text-lg font-bold">Buy coins</h2>
           <p className="mt-1 text-sm text-muted">
-            Every coin costs {naira(data.coinPriceKobo)}. Use coins to send gifts to escorts during their lives, on their profile and on their posts. Paid securely with Paystack.
+            Every coin costs {naira(data.coinPriceKobo)}. Use coins to send gifts to escorts during their lives, on their profile and on their posts. Paid securely with Korapay.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             {data.packs.map((pack) => (
@@ -321,7 +321,8 @@ function ClientWallet({ data, flashes, onError }: { data: ClientData; flashes: R
       ) : null}
 
       <p className="mt-8 text-center text-xs text-muted">
-        Coins are for gifting on Flirta247 only. They cannot be converted to cash or refunded once sent. <Link href="/faqs" className="underline">FAQs</Link>
+        Coins are for gifting on Flirta247 only. They cannot be converted to cash or refunded once sent.{" "}
+        <Link href="/payments-policy" className="underline">Payments policy</Link>
       </p>
     </div>
   );
@@ -396,7 +397,8 @@ function EscortWallet({ data, flashes, reload }: { data: EscortData; flashes: Re
       {tab === "history" ? <WithdrawalHistory withdrawals={data.withdrawals} /> : null}
 
       <p className="mt-8 text-center text-xs text-muted">
-        Earnings are your share of the gifts you receive, in naira. Coins themselves cannot be converted to cash. <Link href="/faqs" className="underline">FAQs</Link>
+        Earnings are your share of the gifts you receive, in naira. Coins themselves cannot be converted to cash.{" "}
+        <Link href="/payments-policy" className="underline">Payments policy</Link>
       </p>
     </div>
   );

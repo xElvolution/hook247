@@ -14,7 +14,7 @@ Framer Motion and GSAP.
 - **The Feed** — post your vibe, fire-react with burst animation, comment
 - "Who likes you" — free users see the count, premium sees the people
 - Premium plans (Plus / Elite), profile **Boost** and **Verified** badge, billed
-  through Paystack checkout with a signature-verified webhook
+  through Korapay checkout with a signature-verified webhook
 - Dark glassmorphic design system, mobile bottom-tabs + desktop sidebar
 
 There is no demo/offline mode: every screen reads from Postgres, so the database
@@ -49,19 +49,27 @@ Copy `.env.example` to `.env` and fill in the values below.
    Mail failures are surfaced, never swallowed — a signup that never receives its
    code is a dead account.
 
-4. **Payments (Paystack)** — set `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`,
-   then register the webhook in the Paystack dashboard
-   (Settings → API Keys & Webhooks):
+4. **Payments and payouts (Korapay)** — set `KORAPAY_SECRET_KEY` and
+   `KORAPAY_PUBLIC_KEY`, then set the webhook URL in the Korapay dashboard
+   (Settings → API Configuration):
 
    ```
-   <NEXT_PUBLIC_APP_URL>/api/webhooks/paystack
+   https://<app host>/api/webhooks/korapay
    ```
+
+   Each checkout also sends that URL as `notification_url`, built from the
+   request host. Payout webhooks (`transfer.success` / `transfer.failed`) only
+   go to the dashboard URL. Webhooks are verified with `x-korapay-signature`
+   (HMAC-SHA256 of the `data` object, keyed by the secret key), and every
+   event is re-checked against the Korapay API before anything is credited,
+   paid or refunded.
 
    The webhook must be reachable from the internet — for local testing expose it
    with a tunnel (`ngrok http 3001`) and use the tunnel URL.
 
-   Purchases also complete from the Paystack callback when the browser lands
-   back on `/premium`, so checkout still works locally without a tunnel.
+   Purchases also complete from the Korapay redirect when the browser lands
+   back on `/premium` or `/coins` (`?reference=...`), so checkout still works
+   locally without a tunnel.
    Fulfilment is idempotent and claims the row atomically, so whichever of the
    two paths arrives second is a no-op — a benefit is never granted twice.
 
@@ -90,9 +98,9 @@ Copy `.env.example` to `.env` and fill in the values below.
 | `BOOST`        | ₦1,500 |
 | `VERIFICATION` | ₦2,000 |
 
-Amounts are stored in kobo in `src/app/api/premium/route.ts`. Fulfilment happens
-in the webhook, keyed on the Paystack `reference`, so a replayed event cannot
-grant a benefit twice.
+Amounts are stored in kobo and converted to naira only when talking to Korapay
+(`src/lib/korapay.ts`). Fulfilment happens in the webhook or the redirect,
+keyed on our `reference`, so a replayed event cannot grant a benefit twice.
 
 ## Seeded accounts
 

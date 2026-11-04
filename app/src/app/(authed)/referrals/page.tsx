@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Copy } from "lucide-react";
 import MoneyInput, { parseNairaInput } from "@/components/MoneyInput";
+import WelcomeRewardCard from "@/components/WelcomeRewardCard";
 
 type HistoryRow = {
   id: string;
@@ -118,6 +119,7 @@ export default function ReferralsPage() {
         One level only. You earn when someone you referred pays a profile plan.
         You do not earn from people they refer.
       </p>
+      <WelcomeRewardCard />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <code className="flex-1 truncate rounded-xl border border-line bg-black/30 px-4 py-3 text-sm">

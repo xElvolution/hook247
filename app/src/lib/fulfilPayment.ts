@@ -1,12 +1,17 @@
 import { db } from "@/lib/db";
-import { verifyTransaction } from "@/lib/paystack";
+import { chargeSettlesExactly, isFailedChargeStatus, KorapayError, verifyCharge } from "@/lib/korapay";
 import { sendReceiptEmail } from "@/lib/mailer";
 import { creditReferralCommission } from "@/lib/referrals";
 
 export type FulfilResult =
   | { ok: true; state: "fulfilled" | "already"; description?: string }
-  | { ok: false; state: "unknown" | "failed"; error: string };
+  | { ok: false; state: "unknown" | "failed" | "pending"; error: string };
 
+/**
+ * Grant a plan, boost or verification once Korapay confirms the charge.
+ * Idempotent: the row is claimed atomically, so the redirect, the webhook and
+ * the admin retry can all run at once and the benefit is granted exactly once.
+ */
 export async function fulfilPayment(reference: string): Promise<FulfilResult> {
   const payment = await db.payment.findUnique({ where: { reference } });
   if (!payment) {
@@ -15,27 +20,44 @@ export async function fulfilPayment(reference: string): Promise<FulfilResult> {
   if (payment.status === "SUCCESS") {
     return { ok: true, state: "already" };
   }
-  if (payment.status === "FAILED" || payment.status === "ABANDONED") {
-    return { ok: false, state: "failed", error: "Payment did not succeed" };
+
+  // FAILED rows are re-checked too: a declined first attempt can still be
+  // paid on the same Korapay checkout, and Korapay is the source of truth.
+  let charge: Awaited<ReturnType<typeof verifyCharge>>;
+  try {
+    charge = await verifyCharge(reference);
+  } catch (err) {
+    if (err instanceof KorapayError && err.status === 404) {
+      return { ok: false, state: "pending", error: "Korapay has no record of this payment yet" };
+    }
+    console.error("Korapay verify failed:", (err as Error).message);
+    return { ok: false, state: "pending", error: "Could not verify with Korapay yet" };
   }
 
-  let verified: Awaited<ReturnType<typeof verifyTransaction>>;
-  try {
-    verified = await verifyTransaction(reference);
-  } catch (err) {
-    console.error("Paystack verify threw:", err);
-    return { ok: false, state: "failed", error: "Could not verify with Paystack" };
-  }
-  if (!verified.success || verified.amountKobo !== payment.amountKobo) {
+  if (isFailedChargeStatus(charge.status)) {
     await db.payment.updateMany({
       where: { id: payment.id, status: "PENDING" },
       data: { status: "FAILED" },
     });
-    return { ok: false, state: "failed", error: "Verification failed" };
+    return { ok: false, state: "failed", error: "Payment did not succeed" };
+  }
+  if (charge.status !== "success") {
+    // Still processing (e.g. a bank transfer on its way, or the buyer closed
+    // the checkout). Leave the row open for the webhook.
+    return { ok: false, state: "pending", error: "Payment not completed yet" };
+  }
+  const check = chargeSettlesExactly(charge, reference, payment.amountKobo);
+  if (!check.ok) {
+    console.error(`Payment ${reference} not fulfilled: ${check.reason}`);
+    await db.payment.updateMany({
+      where: { id: payment.id, status: "PENDING" },
+      data: { status: "FAILED" },
+    });
+    return { ok: false, state: "failed", error: `Verification failed (${check.reason})` };
   }
 
   const claimed = await db.payment.updateMany({
-    where: { id: payment.id, status: "PENDING" },
+    where: { id: payment.id, status: { in: ["PENDING", "FAILED", "ABANDONED"] } },
     data: { status: "SUCCESS", fulfilledAt: new Date() },
   });
   if (claimed.count === 0) {

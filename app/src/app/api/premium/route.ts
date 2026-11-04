@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
-import { initializeTransaction } from "@/lib/paystack";
+import { initializeCharge, KorapayError, newChargeReference } from "@/lib/korapay";
+import { korapayNotificationUrl } from "@/lib/korapayUrls";
 import { requestAppUrl } from "@/lib/publicUrl";
 import { ensureCatalog, isSubscriptionActive } from "@/lib/money";
 
@@ -33,7 +33,6 @@ export async function POST(req: Request) {
 
   let amountKobo = 0;
   let purpose: "SUBSCRIPTION" | "BOOST" = "SUBSCRIPTION";
-  let label = "plan";
 
   if (parsed.data.kind === "plan") {
     const plan = await db.subscriptionPlan.findFirst({
@@ -42,7 +41,6 @@ export async function POST(req: Request) {
     if (!plan) return NextResponse.json({ error: "Plan not available" }, { status: 400 });
     amountKobo = plan.priceKobo;
     purpose = "SUBSCRIPTION";
-    label = plan.slug;
   } else {
     if (!isSubscriptionActive(profile.subscriptionExpiresAt)) {
       return NextResponse.json(
@@ -56,10 +54,9 @@ export async function POST(req: Request) {
     if (!boost) return NextResponse.json({ error: "Boost not available" }, { status: 400 });
     amountKobo = boost.priceKobo;
     purpose = "BOOST";
-    label = boost.slug;
   }
 
-  const reference = `hook247_${label}_${randomUUID()}`;
+  const reference = newChargeReference("f247");
   const payment = await db.payment.create({
     data: {
       userId,
@@ -75,24 +72,27 @@ export async function POST(req: Request) {
   const callbackUrl = `${appUrl}/premium`;
 
   try {
-    const init = await initializeTransaction(
-      profile.user.email,
-      amountKobo,
+    const init = await initializeCharge({
       reference,
-      callbackUrl
-    );
+      amountKobo,
+      email: profile.user.email,
+      redirectUrl: callbackUrl,
+      notificationUrl: korapayNotificationUrl(req),
+      narration: purpose === "BOOST" ? "Flirta247 profile boost" : "Flirta247 profile plan",
+    });
     return NextResponse.json({
-      checkoutUrl: init.authorization_url,
+      checkoutUrl: init.checkoutUrl,
       reference: init.reference,
     });
   } catch (err) {
-    console.error("Paystack initialize failed:", err);
+    console.error("Korapay initialize failed:", (err as Error).message);
     await db.payment.update({
       where: { id: payment.id },
       data: { status: "FAILED" },
     });
+    const refused = err instanceof KorapayError && err.definitive;
     return NextResponse.json(
-      { error: "Could not reach Paystack. Please try again." },
+      { error: refused ? "Korapay could not start this payment. Please try again later." : "Could not reach Korapay. Please try again." },
       { status: 502 }
     );
   }

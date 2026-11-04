@@ -8,7 +8,7 @@ import { failFrom } from "@/lib/http";
 
 const schema = z.object({ reference: z.string().min(8).max(120) });
 
-/** Called when Paystack sends the buyer back to /coins. */
+/** Called when Korapay sends the buyer back to /coins?reference=... */
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first" }, { status: 401 });

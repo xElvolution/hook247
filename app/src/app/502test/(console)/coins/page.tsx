@@ -100,13 +100,13 @@ export default async function CoinsAdminPage({
               Manual withdrawal approval
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" name="paystackTransfersEnabled" defaultChecked={settings.paystackTransfersEnabled} />
-              Paystack transfers enabled
+              <input type="checkbox" name="bankTransfersEnabled" defaultChecked={settings.bankTransfersEnabled} />
+              Korapay payouts enabled
             </label>
           </div>
           <p className="text-xs text-muted sm:col-span-4">
             Every gift is split {settings.escortSharePct}% to the escort and {100 - settings.escortSharePct}% to the platform. The escort share goes straight into their Earnings Wallet.
-            Changes apply to new gifts and withdrawals only. Only tick Paystack transfers once Transfers are switched on for the Paystack business account (and OTP for transfers is disabled).
+            Changes apply to new gifts and withdrawals only. Only tick Korapay payouts once payouts are enabled on the Korapay account, the server IP is whitelisted for payouts and the NGN balance is funded.
             Until then pay escorts by bank transfer and mark requests paid with the reference.
           </p>
           <div className="sm:col-span-4">

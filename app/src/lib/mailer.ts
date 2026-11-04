@@ -76,16 +76,65 @@ export async function sendVerificationEmail(
   code: string,
   minutes: number
 ) {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com").replace(/\/$/, "");
   await sendMail({
     to,
-    subject: "Confirm your Flirta247 account",
+    subject: "Verify your email and subscribe to be listed",
     html: layout(
-      "Confirm your email",
-      `<p style="margin:0;color:#c9bcd4;line-height:1.6">Enter this code to finish setting up your account.</p>
+      "Verify, then subscribe",
+      `<p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Welcome to Flirta247. Confirm this email, finish your profile, then subscribe. Your profile is listed only while a plan is active.</p>
+       <p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Monthly is <strong style="color:#fff">₦10,000</strong>. 3 Months is <strong style="color:#fff">₦25,000</strong>.</p>
        ${codeBlock(code)}
-       <p style="margin:0;color:#8d7f99;font-size:13px">The code expires in ${minutes} minutes. If you did not sign up, ignore this email.</p>`
+       <p style="margin:0 0 18px;color:#8d7f99;font-size:13px">The code expires in ${minutes} minutes. If you did not sign up, ignore this email.</p>
+       <a href="${app}/verify-email" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">Verify and subscribe</a>`
     ),
-    text: `Confirm your Flirta247 email.\n\nCode: ${code}\n\nExpires in ${minutes} minutes. If you did not sign up, ignore this email.`,
+    text: `Welcome to Flirta247. Confirm your email, finish your profile, then subscribe so your profile is listed.\n\nMonthly is ₦10,000. 3 Months is ₦25,000.\n\nCode: ${code}\n\nOpen ${app}/verify-email\nThe code expires in ${minutes} minutes.`,
+  });
+}
+
+export async function sendWelcomeRewardEmail(to: string, amountLabel: string, required: number) {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com").replace(/\/$/, "");
+  await sendMail({
+    to,
+    subject: `Your ${amountLabel} Flirta247 welcome reward`,
+    html: layout(
+      `${amountLabel} Welcome Reward`,
+      `<p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Flirta247 has a <strong style="color:#fff">${amountLabel} Welcome Reward</strong> for verified women. It is not paid for signing up.</p>
+       <p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Finish phone verification, face verification, your profile and a profile photo. Then refer ${required} women who complete the same steps. The reward stays locked until those referrals are verified.</p>
+       <a href="${app}/referrals" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">See your welcome reward</a>`
+    ),
+    text: `Flirta247 has a ${amountLabel} Welcome Reward for verified women. It is not paid for signing up.\n\nFinish phone verification, face verification, your profile and a profile photo. Then refer ${required} women who complete the same steps.\n\nOpen ${app}/referrals`,
+  });
+}
+
+export async function sendRewardGrantedEmail(to: string, label: string) {
+  const app = (process.env.NEXT_PUBLIC_APP_URL ?? "https://flirta247.com").replace(/\/$/, "");
+  await sendMail({
+    to,
+    subject: "You have been rewarded by the Flirta247 team",
+    html: layout(
+      "You have been rewarded",
+      `<p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Congratulations. You have been rewarded by the Flirta247 team.</p>
+       <p style="margin:0 0 18px;color:#fff;font-weight:700">${label}</p>
+       <p style="margin:0 0 18px;color:#c9bcd4;line-height:1.6">It is already on your account.</p>
+       <a href="${app}/profile" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">View your profile</a>`
+    ),
+    text: `Congratulations. You have been rewarded by the Flirta247 team.\n\n${label}\n\nIt is already on your account.\n\n${app}/profile`,
+  });
+}
+
+export async function sendBonusEmail(to: string, label: string, claimUrl: string) {
+  await sendMail({
+    to,
+    subject: "Congratulations — a bonus from the Flirta247 team",
+    html: layout(
+      "You have a bonus to claim",
+      `<p style="margin:0 0 14px;color:#c9bcd4;line-height:1.6">Congratulations. You have been granted a bonus from the Flirta247 team.</p>
+       <p style="margin:0 0 18px;color:#fff;font-weight:700">${label}</p>
+       <p style="margin:0 0 18px;color:#c9bcd4;line-height:1.6">It is not on your account yet. Click to claim it.</p>
+       <a href="${claimUrl}" style="display:inline-block;padding:13px 26px;border-radius:999px;background:linear-gradient(135deg,#ff2d78,#ff6b2c);color:#fff;font-weight:700;text-decoration:none">Click to claim it</a>`
+    ),
+    text: `Congratulations. You have been granted a bonus from the Flirta247 team.\n\n${label}\n\nClick to claim it: ${claimUrl}`,
   });
 }
 

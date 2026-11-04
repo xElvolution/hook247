@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActiveSessionUserId } from "@/lib/user";
-import { resolveAccount } from "@/lib/paystack";
+import { KorapayError, resolveBankAccount } from "@/lib/korapay";
 
 const schema = z.object({
   accountNumber: z.string().regex(/^\d{10}$/, "Account numbers are 10 digits"),
@@ -21,9 +21,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the account details" }, { status: 400 });
   }
   try {
-    const account = await resolveAccount(parsed.data.accountNumber, parsed.data.bankCode);
+    const account = await resolveBankAccount(parsed.data.accountNumber, parsed.data.bankCode);
     return NextResponse.json({ accountName: account.accountName });
-  } catch {
+  } catch (err) {
+    if (err instanceof KorapayError && !err.definitive) {
+      console.error("Korapay account resolve failed:", err.message);
+      return NextResponse.json({ error: "Account lookup is unavailable right now. Try again shortly." }, { status: 502 });
+    }
     return NextResponse.json({ error: "We could not find that account. Check the number and bank." }, { status: 422 });
   }
 }

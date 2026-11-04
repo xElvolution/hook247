@@ -315,7 +315,7 @@ export async function listWithdrawalAccounts(userId: string) {
 
 export const MAX_WITHDRAWAL_ACCOUNTS = 5;
 
-/** Save a bank account whose name has already been confirmed with Paystack. */
+/** Save a bank account whose name has already been confirmed with Korapay. */
 export async function saveWithdrawalAccount(input: {
   userId: string;
   bankCode: string;
@@ -476,10 +476,10 @@ export async function requestEarningsWithdrawal(input: {
       return { withdrawal, balanceKobo: hold.balanceAfterKobo };
     }, TX_OPTIONS);
 
-    if (!manual && settings.paystackTransfersEnabled) {
+    if (!manual && settings.bankTransfersEnabled) {
       // Imported lazily: coinPayouts depends on this module.
-      const { payWithdrawalViaPaystack } = await import("./coinPayouts");
-      await payWithdrawalViaPaystack(withdrawalId).catch((err) =>
+      const { payWithdrawalViaKorapay } = await import("./coinPayouts");
+      await payWithdrawalViaKorapay(withdrawalId).catch((err) =>
         console.error("Automatic payout transfer failed; left for the payout queue:", (err as Error).message)
       );
     }

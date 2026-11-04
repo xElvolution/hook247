@@ -8,6 +8,14 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 25;
 
+function planName(slug: string, plan: string) {
+  if (slug === "monthly") return "Monthly";
+  if (slug === "quarterly") return "3 Months";
+  if (slug === "six_month") return "6 Months";
+  if (plan === "FREE") return "No plan";
+  return plan;
+}
+
 type Search = { q?: string; filter?: string; page?: string };
 
 export default async function UsersPage({
@@ -21,22 +29,37 @@ export default async function UsersPage({
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const now = new Date();
 
-  const where: Prisma.UserWhereInput = {};
+  const and: Prisma.UserWhereInput[] = [];
   if (q) {
-    where.OR = [
-      { email: { contains: q, mode: "insensitive" } },
-      { profile: { displayName: { contains: q, mode: "insensitive" } } },
-    ];
+    and.push({
+      OR: [
+        { email: { contains: q, mode: "insensitive" } },
+        { profile: { is: { displayName: { contains: q, mode: "insensitive" } } } },
+      ],
+    });
   }
-  if (filter === "banned") where.bannedAt = { not: null };
-  if (filter === "unverified") where.emailVerified = false;
-  if (filter === "live") where.profile = { isLive: true };
-  if (filter === "hidden") where.profile = { adminHidden: true };
+  if (filter === "banned") and.push({ bannedAt: { not: null } });
+  if (filter === "unverified") {
+    and.push({
+      OR: [
+        { emailVerified: false },
+        { profile: { is: null } },
+        { profile: { is: { verified: false } } },
+      ],
+    });
+  }
+  if (filter === "live") and.push({ profile: { is: { isLive: true } } });
+  if (filter === "hidden") and.push({ profile: { is: { adminHidden: true } } });
   if (filter === "expired") {
-    where.profile = {
-      OR: [{ subscriptionExpiresAt: null }, { subscriptionExpiresAt: { lte: now } }],
-    };
+    and.push({
+      profile: {
+        is: {
+          OR: [{ subscriptionExpiresAt: null }, { subscriptionExpiresAt: { lte: now } }],
+        },
+      },
+    });
   }
+  const where: Prisma.UserWhereInput = and.length ? { AND: and } : {};
 
   const [users, total] = await Promise.all([
     db.user.findMany({
@@ -75,7 +98,7 @@ export default async function UsersPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {["all", "banned", "unverified", "live", "hidden", "expired"].map((f) => (
+        {[["all", "All"], ["banned", "Banned"], ["unverified", "Unverified"], ["live", "Live"], ["hidden", "Hidden"], ["expired", "No plan"]].map(([f, label]) => (
           <Link
             key={f}
             href={`/502test/users?filter=${f}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
@@ -83,7 +106,7 @@ export default async function UsersPage({
               filter === f ? "bg-brand text-white" : "border border-line text-muted hover:text-ink"
             }`}
           >
-            {f}
+            {label}
           </Link>
         ))}
       </div>
@@ -116,9 +139,12 @@ export default async function UsersPage({
                       {banned ? <Badge tone="bad">Banned</Badge> : null}
                       {suspended ? <Badge tone="warn">Suspended</Badge> : null}
                       {u.profile?.adminHidden ? <Badge tone="bad">Hidden</Badge> : null}
+                      {!u.emailVerified ? <Badge tone="warn">Email unverified</Badge> : null}
+                      {u.profile && !u.profile.verified ? <Badge tone="warn">Unverified</Badge> : null}
                       {u.profile?.verified ? <Badge tone="good">Verified</Badge> : null}
+                      {!u.profile ? <Badge tone="warn">No profile</Badge> : null}
                       {u.profile?.isLive ? <Badge tone="brand">Live</Badge> : null}
-                      {u.profile ? <Badge>{u.profile.plan}</Badge> : null}
+                      {u.profile ? <Badge>{planName(u.profile.subscriptionPlanSlug, u.profile.plan)}</Badge> : null}
                       {u._count.reportsAgainst > 0 ? (
                         <Badge tone="bad">{u._count.reportsAgainst} reports</Badge>
                       ) : null}

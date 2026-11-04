@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { LegalLinks } from "@/components/LegalPage";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -63,7 +64,7 @@ function MemberCard({ member }: { member: Card }) {
       <img
         src={member.avatarUrl}
         alt={member.displayName}
-        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+        className="h-full w-full object-contain"
         loading="lazy"
       />
 
@@ -354,7 +355,8 @@ export default function HomeBrowse({ authed }: { authed: boolean }) {
       </section>
 
       <footer className="mt-10 border-t border-line py-7 text-center text-xs text-muted">
-        Strictly 18+ · Meet in public first · Never send money to someone you have not met
+        <p>Strictly 18+ · Meet in public first · Never send money to someone you have not met</p>
+        <LegalLinks className="mt-3" />
       </footer>
 
       {filtersOpen && (

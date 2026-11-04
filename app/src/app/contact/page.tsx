@@ -42,6 +42,8 @@ export default function ContactPage() {
         <p className="text-sm text-muted">
           Safety reports are prioritised and reviewed within 24 hours. If you
           are in immediate danger, contact local emergency services first.
+          Privacy requests can be sent to support@flirta247.com. See our{" "}
+          <Link href="/privacy" className="underline">Privacy Policy</Link>.
         </p>
       </div>
     </div>

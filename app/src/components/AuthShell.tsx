@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { LegalLinks } from "@/components/LegalPage";
 
 export default function AuthShell({
   title,
@@ -31,6 +32,7 @@ export default function AuthShell({
         <h1 className="font-display mt-6 text-3xl font-bold">{title}</h1>
         <p className="mt-2 text-sm text-muted">{subtitle}</p>
         <div className="mt-7">{children}</div>
+        <LegalLinks className="mt-6" />
       </motion.div>
     </div>
   );

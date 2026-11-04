@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   Plan,
   ReportStatus,
@@ -222,7 +223,7 @@ export async function setPlan(formData: FormData) {
 }
 
 /**
- * Re-run fulfilment for a payment that Paystack took but the app never applied
+ * Re-run fulfilment for a payment that Korapay took but the app never applied
  * — the usual cause is a webhook that never arrived. Safe to press twice:
  * fulfilPayment claims the row atomically and grants the benefit exactly once.
  */
@@ -256,52 +257,66 @@ function revalidateProfiles() {
   revalidatePath("/");
 }
 
-export async function grantSubscription(formData: FormData) {
+async function offerCatalogBonus(formData: FormData, kind: "plan" | "boost") {
   await requireAdmin();
   const userId = String(formData.get("userId") ?? "");
-  const days = Math.max(1, Math.min(365, Number(formData.get("days") ?? 30) || 30));
-  if (!userId) return;
-
+  const productId = String(formData.get("productId") ?? "");
+  if (!userId || !productId) return;
+  const user = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
   const profile = await db.profile.findUnique({ where: { userId } });
-  if (!profile) return;
+  if (!user || !profile) {
+    redirect(`/502test/users/${userId}?error=${encodeURIComponent("This account has no profile yet")}`);
+  }
+  const { nairaFromKobo } = await import("@/lib/money");
+  const { sendRewardGrantedEmail } = await import("@/lib/mailer");
+  const product = kind === "plan"
+    ? await db.subscriptionPlan.findFirst({ where: { id: productId, active: true } })
+    : await db.boostProduct.findFirst({ where: { id: productId, active: true } });
+  if (!product) redirect(`/502test/users/${userId}?error=${encodeURIComponent("That plan is not available")}`);
 
   const now = new Date();
-  const base =
-    profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > now
-      ? profile.subscriptionExpiresAt
-      : now;
-  const expires = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
-  await db.profile.update({
-    where: { userId },
-    data: {
-      plan: days >= 90 ? "ELITE" : "PLUS",
-      subscriptionExpiresAt: expires,
-      subscriptionPlanSlug: days >= 90 ? "quarterly" : "monthly",
-      adminHidden: false,
-    },
-  });
-  await logAdminAction("user.grant", "user", userId, `${days}d`);
+  const label = `${product.name} · ${nairaFromKobo(product.priceKobo)}`;
+  if (kind === "plan" && "durationDays" in product) {
+    const days = Math.max(1, product.durationDays);
+    const base = profile.subscriptionExpiresAt && profile.subscriptionExpiresAt > now ? profile.subscriptionExpiresAt : now;
+    await db.profile.update({
+      where: { userId },
+      data: {
+        plan: days >= 90 ? "ELITE" : "PLUS",
+        subscriptionExpiresAt: new Date(base.getTime() + days * 24 * 60 * 60 * 1000),
+        subscriptionPlanSlug: product.slug,
+        adminHidden: false,
+      },
+    });
+  } else if ("durationHours" in product) {
+    const base = profile.boostedUntil && profile.boostedUntil > now ? profile.boostedUntil : now;
+    await db.profile.update({
+      where: { userId },
+      data: {
+        boostedAt: now,
+        boostedUntil: new Date(base.getTime() + Math.max(1, product.durationHours) * 60 * 60 * 1000),
+        adminHidden: false,
+      },
+    });
+  }
+  await logAdminAction(kind === "plan" ? "user.grant" : "user.boost", "user", userId, label);
+  let message = `${label} added. Reward email sent.`;
+  try {
+    await sendRewardGrantedEmail(user.email, label);
+  } catch (err) {
+    console.error("Reward email failed:", (err as Error).message);
+    message = `${label} added. The reward email could not be sent.`;
+  }
   revalidateUser(userId);
+  redirect(`/502test/users/${userId}?sent=${encodeURIComponent(message)}`);
+}
+
+export async function grantSubscription(formData: FormData) {
+  await offerCatalogBonus(formData, "plan");
 }
 
 export async function grantBoost(formData: FormData) {
-  await requireAdmin();
-  const userId = String(formData.get("userId") ?? "");
-  const hours = Math.max(1, Math.min(24 * 60, Number(formData.get("hours") ?? 168) || 168));
-  if (!userId) return;
-
-  const profile = await db.profile.findUnique({ where: { userId } });
-  if (!profile) return;
-
-  const now = new Date();
-  const base = profile.boostedUntil && profile.boostedUntil > now ? profile.boostedUntil : now;
-  const until = new Date(base.getTime() + hours * 60 * 60 * 1000);
-  await db.profile.update({
-    where: { userId },
-    data: { boostedAt: now, boostedUntil: until, adminHidden: false },
-  });
-  await logAdminAction("user.boost", "user", userId, `${hours}h`);
-  revalidateUser(userId);
+  await offerCatalogBonus(formData, "boost");
 }
 
 export async function hideProfile(formData: FormData) {
@@ -313,6 +328,8 @@ export async function hideProfile(formData: FormData) {
     data: { adminHidden: true, isLive: false, availableToday: false },
   });
   await logAdminAction("user.hide", "user", userId);
+  const { syncWelcome } = await import("@/lib/welcome");
+  await syncWelcome(userId).catch(() => undefined);
   revalidateUser(userId);
 }
 
@@ -325,6 +342,8 @@ export async function showProfile(formData: FormData) {
     data: { adminHidden: false },
   });
   await logAdminAction("user.show", "user", userId);
+  const { syncWelcome } = await import("@/lib/welcome");
+  await syncWelcome(userId).catch(() => undefined);
   revalidateUser(userId);
 }
 

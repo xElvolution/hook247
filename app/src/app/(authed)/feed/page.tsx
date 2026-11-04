@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -17,6 +17,7 @@ import {
   Radio,
   Send,
   Share2,
+  Smile,
   Sparkles,
   TrendingUp,
   Users,
@@ -255,6 +256,22 @@ export default function FeedPage() {
   const [eroticaState, setEroticaState] = useState<"idle" | "loading" | "needsLogin" | "needsConfirm" | "ready" | "error">("idle");
   const [canPostErotica, setCanPostErotica] = useState(false);
   const [attest, setAttest] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
+  const emojis = ["😀", "😂", "🥰", "😍", "😘", "🔥", "💋", "❤️", "✨", "🌹", "💃", "👀", "💯", "🎉", "😎", "😏", "💖", "🌸", "⭐", "🙏"];
+
+  function insertEmoji(emoji: string) {
+    const el = draftRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const next = `${draft.slice(0, start)}${emoji}${draft.slice(end)}`.slice(0, 1000);
+    setDraft(next);
+    const pos = Math.min(start + emoji.length, next.length);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(pos, pos);
+    });
+  }
 
   async function load() {
     const response = await fetch("/api/feed");
@@ -497,7 +514,14 @@ export default function FeedPage() {
           </div>
         ) : (eroticaMode && eroticaState !== "ready") ? null : (
         <form id="feed-composer" onSubmit={publish} className="pulse-composer mt-4">
-          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Flirta247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
+          <textarea ref={draftRef} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={guest ? "Join Flirta247 to share an update" : pollMode ? "Add a caption (optional)" : "Share what is happening"} />
+          {emojiOpen ? (
+            <div className="emoji-pop" role="listbox" aria-label="Emoji">
+              {emojis.map((emoji) => (
+                <button key={emoji} type="button" onClick={() => insertEmoji(emoji)}>{emoji}</button>
+              ))}
+            </div>
+          ) : null}
           {pollMode && !eroticaMode && <PollBuilder value={pollDraft} onChange={setPollDraft} />}
           {previewUrl && (
             <div className="pulse-upload-preview">
@@ -530,6 +554,9 @@ export default function FeedPage() {
                   <BarChart3 className="h-4 w-4" /> Poll
                 </button>
               )}
+              <button type="button" onClick={() => setEmojiOpen((open) => !open)} data-active={emojiOpen} aria-pressed={emojiOpen}>
+                <Smile className="h-4 w-4" /> Emoji
+              </button>
             </div>
             <span>{draft.length}/1000</span>
             <button type="submit" className="btn-primary !px-5 !py-2 text-xs" disabled={(pollMode && !eroticaMode ? !!pollDraftProblem(pollDraft) : (!draft.trim() && !mediaFile) || (eroticaMode && !attest)) || posting}>{posting ? "Publishing..." : pollMode && !eroticaMode ? "Post poll" : eroticaMode ? "Post to Erotica" : "Post update"}</button>

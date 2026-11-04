@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { nairaFromKobo } from "@/lib/money";
 import { getCoinSettings } from "@/lib/coins";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
-import { payoutApprove, payoutMarkPaid, payoutReject, payoutViaPaystack } from "../coins/actions";
+import { isKorapayPayoutReference } from "@/lib/coinPayouts";
+import { getBalances } from "@/lib/korapay";
+import { payoutApprove, payoutCheckStatus, payoutMarkPaid, payoutReject, payoutViaKorapay } from "../coins/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,7 @@ export default async function CoinPayoutsPage({
 }) {
   const params = await searchParams;
   const status = params.status ?? "open";
-  const [settings, rows] = await Promise.all([
+  const [settings, rows, korapayBalance] = await Promise.all([
     getCoinSettings(),
     db.coinWithdrawal.findMany({
       where: status === "open" ? { status: { in: ["REQUESTED", "APPROVED"] } } : status === "all" ? {} : { status: status as "PAID" | "REJECTED" },
@@ -26,6 +28,12 @@ export default async function CoinPayoutsPage({
       orderBy: { createdAt: status === "open" ? "asc" : "desc" },
       take: 100,
     }),
+    getBalances()
+      .then((b) => b.NGN ?? null)
+      .catch((err) => {
+        console.error("Korapay balance lookup failed:", (err as Error).message);
+        return null;
+      }),
   ]);
 
   return (
@@ -34,8 +42,13 @@ export default async function CoinPayoutsPage({
         <h1 className="font-display text-2xl font-bold">Earnings payouts</h1>
         <p className="mt-1 text-sm text-muted">
           Escort withdrawals from their Earnings Wallet. Fee {settings.withdrawalFeeBps / 100}%, no minimum. Manual approval is{" "}
-          {settings.manualWithdrawalApproval ? "on" : "off"} and Paystack transfers are {settings.paystackTransfersEnabled ? "on" : "off"}{" "}
+          {settings.manualWithdrawalApproval ? "on" : "off"} and Korapay payouts are {settings.bankTransfersEnabled ? "on" : "off"}{" "}
           (<Link href="/502test/coins" className="underline">settings</Link>).
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          {korapayBalance
+            ? `Korapay NGN balance: ${nairaFromKobo(korapayBalance.availableKobo)} available, ${nairaFromKobo(korapayBalance.pendingKobo)} pending.`
+            : "Korapay balance unavailable right now."}
         </p>
       </div>
       {params.error ? <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{params.error}</p> : null}
@@ -94,7 +107,15 @@ export default async function CoinPayoutsPage({
                   {w.payoutReference ? ` · ref ${w.payoutReference}` : ""}
                   {w.adminNote ? ` · ${w.adminNote}` : ""}
                 </p>
-                {w.status === "REQUESTED" || w.status === "APPROVED" ? (
+                {(w.status === "REQUESTED" || w.status === "APPROVED") && isKorapayPayoutReference(w.payoutReference) ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge tone="warn">Korapay payout in flight</Badge>
+                    <form action={payoutCheckStatus}>
+                      <input type="hidden" name="id" value={w.id} />
+                      <button type="submit" className="rounded border border-brand/50 px-2.5 py-1 text-xs font-semibold text-brand-2">Check Korapay status</button>
+                    </form>
+                  </div>
+                ) : w.status === "REQUESTED" || w.status === "APPROVED" ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {w.status === "REQUESTED" && w.source === "earnings" ? (
                       <form action={payoutApprove} className="flex gap-1.5">
@@ -113,10 +134,10 @@ export default async function CoinPayoutsPage({
                       <input name="note" placeholder="Reason" className={`${input} w-40`} />
                       <button type="submit" className="rounded border border-red-500/40 px-2.5 py-1 text-xs font-semibold text-red-300">Reject and refund</button>
                     </form>
-                    {settings.paystackTransfersEnabled && !w.payoutReference ? (
-                      <form action={payoutViaPaystack}>
+                    {settings.bankTransfersEnabled && !w.payoutReference ? (
+                      <form action={payoutViaKorapay}>
                         <input type="hidden" name="id" value={w.id} />
-                        <button type="submit" className="rounded border border-brand/50 px-2.5 py-1 text-xs font-semibold text-brand-2">Pay via Paystack</button>
+                        <button type="submit" className="rounded border border-brand/50 px-2.5 py-1 text-xs font-semibold text-brand-2">Pay via Korapay</button>
                       </form>
                     ) : null}
                   </div>
