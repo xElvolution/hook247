@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { ageFrom } from "@/lib/user";
-import { feedShowAnyWithMedia, HAS_MEDIA } from "@/lib/feedVisibility";
+import { featuredShowAll, feedShowAnyWithMedia, HAS_MEDIA } from "@/lib/feedVisibility";
 import { VISIBLE_PROFILE } from "@/lib/moderation";
 import type { Prisma } from "@prisma/client";
 import { isMockSession, mockBrowse } from "@/lib/mock";
@@ -110,10 +110,11 @@ export async function GET(request: Request) {
 
   // Seeded with the moderation filter so every list built from it — featured,
   // live and members alike — excludes banned accounts by construction.
+  const [anyMedia, featuredAll] = await Promise.all([feedShowAnyWithMedia(), featuredShowAll()]);
   const commonFilters: Prisma.ProfileWhereInput[] = [
     VISIBLE_PROFILE,
     { role: "ESCORT" },
-    ...((await feedShowAnyWithMedia())
+    ...(anyMedia
       ? [HAS_MEDIA, { birthDate: { lte: birthDateForAge(18) } }]
       : [{ subscriptionExpiresAt: { gt: new Date() } }]),
   ];
@@ -166,11 +167,15 @@ export async function GET(request: Request) {
 
   const [featured, liveProfiles, members] = await Promise.all([
     db.profile.findMany({
-      where: {
-        AND: [commonWhere, { OR: [{ boostedUntil: { gt: new Date() } }, { verified: true }] }],
-      },
+      // With the Featured switch on, anyone who is listed can be featured:
+      // boosted first, then verified, then the newest sign-ups.
+      where: featuredAll
+        ? commonWhere
+        : { AND: [commonWhere, { OR: [{ boostedUntil: { gt: new Date() } }, { verified: true }] }] },
       include: { services },
-      orderBy: [{ boostedUntil: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
+      orderBy: featuredAll
+        ? [{ boostedUntil: { sort: "desc", nulls: "last" } }, { verified: "desc" }, { createdAt: "desc" }]
+        : [{ boostedUntil: { sort: "desc", nulls: "last" } }, { lastActive: "desc" }],
       take: 10,
     }),
     db.profile.findMany({

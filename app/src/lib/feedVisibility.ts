@@ -15,6 +15,12 @@ export const HAS_MEDIA: Prisma.ProfileWhereInput = {
   ],
 };
 
+/** Featured switch (Profiles page). Defaults ON when no settings row exists. */
+export async function featuredShowAll() {
+  const row = await db.platformSettings.findUnique({ where: { id: "default" }, select: { featuredShowAll: true } });
+  return row?.featuredShowAll ?? true;
+}
+
 /** Admin switch (Profiles page). Defaults ON when no settings row exists. */
 export async function feedShowAnyWithMedia() {
   const row = await db.platformSettings.findUnique({

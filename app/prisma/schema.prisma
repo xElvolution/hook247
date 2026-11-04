@@ -504,6 +504,8 @@ model PlatformSettings {
   /// Profiles listing: show any non-banned, non-hidden 18+ escort profile that
   /// has a photo or video, ignoring the subscription gate.
   feedShowAnyWithMedia Boolean  @default(true)
+  /// Featured rail: include any listed member, not only boosted/verified.
+  featuredShowAll      Boolean  @default(true)
   updatedAt            DateTime @updatedAt
 }
 

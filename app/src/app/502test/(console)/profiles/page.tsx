@@ -3,8 +3,8 @@ import { Prisma } from "@prisma/client";
 import { ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
-import { feedShowAnyWithMedia } from "@/lib/feedVisibility";
-import { setFeedShowAnyWithMedia } from "./actions";
+import { featuredShowAll, feedShowAnyWithMedia } from "@/lib/feedVisibility";
+import { setFeaturedShowAll, setFeedShowAnyWithMedia } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +57,7 @@ export default async function ProfilesAdminPage({
     db.profile.count({ where }),
   ]);
   const pages = Math.ceil(total / PAGE_SIZE);
-  const anyMedia = await feedShowAnyWithMedia();
+  const [anyMedia, featuredAll] = await Promise.all([feedShowAnyWithMedia(), featuredShowAll()]);
 
   return (
     <div className="space-y-5">
@@ -100,6 +100,27 @@ export default async function ProfilesAdminPage({
           className={`rounded-full px-4 py-2 text-sm font-semibold ${anyMedia ? "bg-brand text-white" : "border border-line text-muted"}`}
         >
           {anyMedia ? "ON · Turn off" : "OFF · Turn on"}
+        </button>
+      </form>
+
+      <form
+        action={setFeaturedShowAll}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">Show all members in Featured (verified or not)</p>
+          <p className="mt-1 text-xs text-muted">
+            {featuredAll
+              ? "ON: Featured shows every listed member. Boosted first, then verified, then the newest sign-ups."
+              : "OFF: Featured shows only boosted or verified profiles."}
+          </p>
+        </div>
+        <input type="hidden" name="on" value={featuredAll ? "0" : "1"} />
+        <button
+          aria-pressed={featuredAll}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${featuredAll ? "bg-brand text-white" : "border border-line text-muted"}`}
+        >
+          {featuredAll ? "ON · Turn off" : "OFF · Turn on"}
         </button>
       </form>
 
