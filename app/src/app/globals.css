@@ -4888,3 +4888,11 @@ body {
 .promo-code { margin-top: 0.5rem; text-align: center; font-size: 0.8rem; color: var(--color-muted); }
 .promo-code strong { color: #fff; letter-spacing: 0.06em; }
 .promo-note { margin-top: 0.9rem; font-size: 0.78rem; line-height: 1.5; color: var(--color-muted); }
+
+.face-change-btn {
+  display: inline-flex; width: 100%; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 2.75rem; border-radius: 9999px; border: 1.5px solid rgba(240, 100, 142, 0.7);
+  color: #f0648e; font-weight: 600; font-size: 0.875rem; background: transparent;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.face-change-btn:hover, .face-change-btn:active { background: rgba(223, 58, 106, 0.1); }

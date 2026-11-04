@@ -27,7 +27,7 @@ export default function GetVerifiedButton({ className = "" }: { className?: stri
             <button type="button" className="verify-sheet-close" aria-label="Close" onClick={() => setOpen(false)}>
               <X className="h-4 w-4" />
             </button>
-            <h2 id="verify-sheet-title" className="font-display text-xl font-bold">Verify your face</h2>
+            <h2 id="verify-sheet-title" className="font-display text-xl font-bold">Verify your account</h2>
             <ol className="mt-4 space-y-3 text-sm">
               <li className="flex items-center gap-3"><span className="verify-sheet-step"><ImageUp className="h-4 w-4" /></span>Upload a clear photo of yourself</li>
               <li className="flex items-center gap-3"><span className="verify-sheet-step"><Camera className="h-4 w-4" /></span>Do a quick live check: look, blink, turn</li>

@@ -3,7 +3,7 @@ import FaceVerify from "@/components/FaceVerify";
 import { getSessionUserId } from "@/lib/session";
 import { faceStatus } from "@/lib/faceVerify";
 
-export const metadata = { title: "Face verification | Flirta247" };
+export const metadata = { title: "Verify your account | Flirta247" };
 export const dynamic = "force-dynamic";
 
 export default async function VerifyPage() {

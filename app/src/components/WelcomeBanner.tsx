@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Check, Copy, Gift, Lock, UserPlus, Users, X } from "lucide-react";
+import { BadgeCheck, Check, Copy, Gift, UserPlus, Users, X } from "lucide-react";
 
 type Notice =
   | { show: false }
@@ -120,7 +120,7 @@ export default function WelcomeBanner() {
                 <p className="reward-pop-copy">A welcome gift for new members. Tap claim to see how to get it.</p>
                 <ol className="reward-pop-steps">
                   <Step done={n.state !== "guest"} icon={<UserPlus className="h-4 w-4" />} label="Sign up" />
-                  <Step done={n.state === "refer"} icon={<BadgeCheck className="h-4 w-4" />} label="Verify your face" />
+                  <Step done={n.state === "refer"} icon={<BadgeCheck className="h-4 w-4" />} label="Verify your account" />
                   <Step done={false} icon={<Users className="h-4 w-4" />} label={`Refer ${n.required} people`} />
                 </ol>
                 {n.state === "refer" ? (
@@ -139,8 +139,7 @@ export default function WelcomeBanner() {
               </>
             ) : n.state === "verify" ? (
               <>
-                <p className="reward-pop-copy">Verify your face first. It&apos;s a quick photo and live check, under a minute. Then come back to claim your reward.</p>
-                <p className="reward-pop-private"><Lock className="h-3.5 w-3.5" /> Private. Never posted or shared.</p>
+                <p className="reward-pop-copy">Verify your account, then come back to claim your reward.</p>
                 <Link href="/verify" className="reward-pop-cta">Verify now</Link>
                 <button type="button" className="reward-pop-later" onClick={close}>Remind me later</button>
               </>

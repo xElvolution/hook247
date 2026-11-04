@@ -89,6 +89,7 @@ export default function FaceVerify({ initial }: { initial: Status }) {
   const [status, setStatus] = useState<Status | null>(initial);
   const [stage, setStage] = useState<Stage>(initial.verified ? "passed" : initial.hasReference ? "ready" : "upload");
   const [file, setFile] = useState<File | null>(null);
+  const changeInput = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">(initial.referencePublic ? "public" : "private");
   const [busy, setBusy] = useState(false);
@@ -111,19 +112,20 @@ export default function FaceVerify({ initial }: { initial: Status }) {
     if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
   }, [preview]);
 
-  function pick(next: File | null) {
+  function pick(next: File | null): boolean {
     setError("");
-    if (!next) return;
+    if (!next) return false;
     if (!/^image\/(jpeg|png|webp)$/.test(next.type)) {
       setError("Use a JPG, PNG or WEBP photo. On iPhone choose Most Compatible, not HEIC.");
-      return;
+      return false;
     }
     if (next.size > 15 * 1024 * 1024) {
       setError("Photos must be 15 MB or smaller.");
-      return;
+      return false;
     }
     setFile(next);
     setPreview(URL.createObjectURL(next));
+    return true;
   }
 
   async function uploadReference() {
@@ -156,7 +158,7 @@ export default function FaceVerify({ initial }: { initial: Status }) {
         <div>
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted">Verification</p>
           <h1 className="font-display text-2xl font-extrabold leading-tight md:text-3xl">
-            Face <span className="text-gradient">verification</span>
+            Verify your <span className="text-gradient">account</span>
           </h1>
         </div>
       </div>
@@ -185,7 +187,7 @@ export default function FaceVerify({ initial }: { initial: Status }) {
                     pick(event.dataTransfer.files?.[0] ?? null);
                   }}
                 >
-                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => pick(event.target.files?.[0] ?? null)} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { pick(event.target.files?.[0] ?? null); event.target.value = ""; }} />
                   {preview ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={preview} alt="Your selected photo" className="face-drop-img" />
@@ -239,11 +241,23 @@ export default function FaceVerify({ initial }: { initial: Status }) {
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
                       {status.referencePublic ? <><Eye className="h-3.5 w-3.5" /> Shown on your profile</> : <><Lock className="h-3.5 w-3.5" /> Private, verification only</>}
                     </p>
-                    <button type="button" className="mt-1.5 text-xs font-semibold text-[#f0648e] hover:underline" onClick={() => setStage("upload")}>
-                      Use a different photo
-                    </button>
                   </div>
                 </div>
+                <input
+                  ref={changeInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  aria-label="Choose a new verification photo"
+                  onChange={(event) => {
+                    const next = event.target.files?.[0] ?? null;
+                    event.target.value = "";
+                    if (next && pick(next)) setStage("upload");
+                  }}
+                />
+                <button type="button" className="face-change-btn mt-4" onClick={() => changeInput.current?.click()}>
+                  <ImagePlus className="h-4 w-4" /> Change photo
+                </button>
                 {status.lastError ? <ErrorNote message={`Last try: ${status.lastError}`} /> : null}
                 <div className="privacy-note mt-5"><Lock className="h-5 w-5 shrink-0" aria-hidden /><p><strong>Private:</strong> your verification video is never posted or shown to anyone. It&apos;s only used to confirm it&apos;s you.</p></div>
                 <button type="button" className="btn-primary mt-6 w-full" disabled={attemptsLeft <= 0} onClick={() => setStage("camera")}>

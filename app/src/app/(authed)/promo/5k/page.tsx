@@ -27,7 +27,7 @@ export default async function PromoPage() {
   const pct = n.required ? Math.round((n.qualified / n.required) * 100) : 0;
   const steps = [
     { done: n.state !== "guest", icon: <UserPlus className="h-4 w-4" />, label: "Sign up for free" },
-    { done: n.state === "refer", icon: <BadgeCheck className="h-4 w-4" />, label: "Verify your face" },
+    { done: n.state === "refer", icon: <BadgeCheck className="h-4 w-4" />, label: "Verify your account" },
     { done: n.qualified >= n.required, icon: <Users className="h-4 w-4" />, label: `Refer ${n.required} people who sign up` },
   ];
 
@@ -42,8 +42,8 @@ export default async function PromoPage() {
           {n.state === "refer"
             ? `Copy your special referral link and refer ${n.required} people who sign up to claim your ${n.amountLabel}.`
             : n.state === "verify"
-              ? `Verify your face, then refer ${n.required} people who sign up to claim your ${n.amountLabel}.`
-              : `Sign up, verify your face, then refer ${n.required} people who sign up to claim your ${n.amountLabel}.`}
+              ? `Verify your account, then refer ${n.required} people who sign up to claim your ${n.amountLabel}.`
+              : `Sign up, verify your account, then refer ${n.required} people who sign up to claim your ${n.amountLabel}.`}
         </p>
       </section>
 
@@ -77,7 +77,7 @@ export default async function PromoPage() {
               <div className="promo-bar"><span style={{ width: `${pct}%` }} /></div>
             </div>
             {n.link ? <PromoCopyLink link={n.link} code={n.code} /> : null}
-            <p className="promo-note">A referral counts once they sign up and verify their face. When you reach {n.required}/{n.required}, withdraw from your referral dashboard.</p>
+            <p className="promo-note">A referral counts once they sign up and verify their account. When you reach {n.required}/{n.required}, withdraw from your referral dashboard.</p>
             <Link href="/referrals" className="promo-later">Open referral dashboard</Link>
           </>
         )}

@@ -155,7 +155,7 @@ export default function WelcomeRewardCard() {
       {!identityDone ? (
         <p className="mt-4 text-sm text-muted">
           Face verification: upload a photo and take a quick live selfie.{" "}
-          <Link href="/verify" className="underline">Verify my face</Link>
+          <Link href="/verify" className="underline">Verify my account</Link>
         </p>
       ) : null}
 

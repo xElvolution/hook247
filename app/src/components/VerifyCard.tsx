@@ -17,7 +17,7 @@ export default function VerifyCard({ verified }: { verified: boolean }) {
         <span className="btn-ghost mt-4 w-full !py-2.5 text-sm opacity-60">Already verified</span>
       ) : (
         <Link href="/verify" className="btn-primary mt-4 w-full !py-2.5 text-sm">
-          <ScanFace className="h-4 w-4" /> Verify my face
+          <ScanFace className="h-4 w-4" /> Verify my account
         </Link>
       )}
     </div>
