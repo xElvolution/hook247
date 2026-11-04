@@ -245,6 +245,7 @@ export default function FaceVerify({ initial }: { initial: Status }) {
                   </div>
                 </div>
                 {status.lastError ? <ErrorNote message={`Last try: ${status.lastError}`} /> : null}
+                <div className="privacy-note mt-5"><Lock className="h-5 w-5 shrink-0" aria-hidden /><p><strong>Private:</strong> your verification video is never posted or shown to anyone. It&apos;s only used to confirm it&apos;s you.</p></div>
                 <button type="button" className="btn-primary mt-6 w-full" disabled={attemptsLeft <= 0} onClick={() => setStage("camera")}>
                   <ScanFace className="h-4 w-4" /> Start live check
                 </button>
@@ -254,6 +255,10 @@ export default function FaceVerify({ initial }: { initial: Status }) {
 
             {stage === "camera" && (
               <motion.div key="camera" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="privacy-note mb-3 !mt-0">
+                  <Lock className="h-5 w-5 shrink-0" aria-hidden />
+                  <p><strong>Private:</strong> this live check is never posted or shown to anyone. It&apos;s only used to confirm it&apos;s you.</p>
+                </div>
                 <LiveCheck
                   onCancel={() => setStage("ready")}
                   onSubmitting={() => setStage("checking")}

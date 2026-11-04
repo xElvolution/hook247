@@ -4796,3 +4796,31 @@ body {
 }
 .face-pulse { animation: face-pulse 1.4s ease-in-out infinite; }
 @keyframes face-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(223, 58, 106, 0.35); } 50% { box-shadow: 0 0 0 18px rgba(223, 58, 106, 0); } }
+
+/* Reward pill (home only) */
+.reward-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-bottom: 0.9rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b3dff, #df3a6a);
+  box-shadow: 0 6px 18px rgba(223, 58, 106, 0.28);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.reward-pill-link { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.35rem 0.4rem 0.85rem; }
+.reward-pill-x { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; margin-right: 0.2rem; border-radius: 999px; opacity: 0.85; }
+.reward-pill-x:hover { background: rgba(255, 255, 255, 0.18); opacity: 1; }
+
+/* Verify intro sheet */
+.verify-sheet-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); }
+.verify-sheet { position: relative; width: 100%; max-width: 28rem; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1.4rem 1.4rem 0 0; background: #17151b; padding: 1.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { .verify-sheet-backdrop { align-items: center; } .verify-sheet { border-radius: 1.4rem; padding: 1.75rem; } }
+.verify-sheet-close { position: absolute; top: 0.9rem; right: 0.9rem; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 999px; color: var(--color-muted); }
+.verify-sheet-close:hover { background: rgba(255, 255, 255, 0.06); }
+.verify-sheet-step { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 0.7rem; background: rgba(223, 58, 106, 0.16); color: #f0648e; }
+.privacy-note { display: flex; gap: 0.75rem; align-items: flex-start; border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 0.9rem; background: rgba(52, 211, 153, 0.08); padding: 0.8rem 0.9rem; color: #c8f2df; font-size: 0.85rem; line-height: 1.45; }
+.privacy-note svg { color: #34d399; margin-top: 0.1rem; }
+.privacy-note strong { color: #fff; }

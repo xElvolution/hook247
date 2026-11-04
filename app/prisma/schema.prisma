@@ -153,6 +153,8 @@ model User {
   payoutsFrozen   Boolean @default(false)
   /// Set once the welcome-reward email has been sent, so login does not send it again.
   welcomeNotifiedAt  DateTime?
+  /// Member closed the home reward pill.
+  rewardPillDismissedAt DateTime?
 
   welcomeReward       WelcomeReward?
   memberVerification  MemberVerification?
@@ -499,6 +501,9 @@ model PlatformSettings {
   minWithdrawalKobo    Int      @default(500000)
   holdHours            Int      @default(72)
   revenueResetAt       DateTime?
+  /// Profiles listing: show any non-banned, non-hidden 18+ escort profile that
+  /// has a photo or video, ignoring the subscription gate.
+  feedShowAnyWithMedia Boolean  @default(true)
   updatedAt            DateTime @updatedAt
 }
 

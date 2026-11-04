@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { Panel, Badge, Empty } from "@/components/admin/Ui";
+import { feedShowAnyWithMedia } from "@/lib/feedVisibility";
+import { setFeedShowAnyWithMedia } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,7 @@ export default async function ProfilesAdminPage({
     db.profile.count({ where }),
   ]);
   const pages = Math.ceil(total / PAGE_SIZE);
+  const anyMedia = await feedShowAnyWithMedia();
 
   return (
     <div className="space-y-5">
@@ -78,6 +81,27 @@ export default async function ProfilesAdminPage({
           </button>
         </form>
       </div>
+
+      <form
+        action={setFeedShowAnyWithMedia}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">Show any profile with a photo or video</p>
+          <p className="mt-1 text-xs text-muted">
+            {anyMedia
+              ? "ON: every escort profile with a photo or video appears in the listing, paid plan or not. Banned, hidden and under-18 profiles stay out."
+              : "OFF: only profiles with an active paid plan appear in the listing."}
+          </p>
+        </div>
+        <input type="hidden" name="on" value={anyMedia ? "0" : "1"} />
+        <button
+          aria-pressed={anyMedia}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${anyMedia ? "bg-brand text-white" : "border border-line text-muted"}`}
+        >
+          {anyMedia ? "ON · Turn off" : "OFF · Turn on"}
+        </button>
+      </form>
 
       <div className="flex flex-wrap gap-2">
         {["all", "active", "expired", "boosted", "live", "hidden", "unverified"].map((f) => (

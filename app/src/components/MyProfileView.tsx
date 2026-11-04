@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import GetVerifiedButton from "@/components/GetVerifiedButton";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -154,19 +155,6 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
 
   return (
     <div className="mx-auto max-w-6xl">
-      {!profile.verified ? (
-        <div className="verify-banner mb-5">
-          <div>
-            <p className="verify-banner-kicker">No verified badge yet</p>
-            <p className="verify-banner-copy">
-              Verify your face in under a minute so clients can trust this profile. The badge shows on your photos, cards, and public page.
-            </p>
-          </div>
-          <Link href="/verify" className="btn-primary shrink-0 text-sm">
-            <BadgeCheck className="h-4 w-4" /> Get verified
-          </Link>
-        </div>
-      ) : null}
 
       <div className="section-heading-row mb-6 items-end">
         <div>
@@ -343,9 +331,7 @@ export default function MyProfileView({ initial }: { initial: MyProfileData }) {
         <p className="text-xs text-muted">Signed in as {profile.email}</p>
         <div className="flex flex-wrap gap-2">
           {!profile.verified && (
-            <Link href="/verify" className="btn-ghost !px-4 !py-2.5 text-sm">
-              <BadgeCheck className="h-4 w-4" /> Get verified
-            </Link>
+            <GetVerifiedButton className="btn-ghost !px-4 !py-2.5 text-sm" />
           )}
           {profile.plan === "FREE" && (
             <Link href="/premium" className="btn-primary !px-4 !py-2.5 text-sm">

@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
-import WelcomeBanner from "@/components/WelcomeBanner";
 import {
   BUILD_OPTIONS,
   BUST_OPTIONS,
@@ -625,7 +624,6 @@ function ProfileSetup() {
   return (
     <main className="profile-setup-page">
       <section className="profile-setup-shell">
-        <WelcomeBanner />
         <header className="profile-setup-header">
           <div>
             <p className="section-kicker">{editing ? "Edit profile" : "Create profile"}</p>

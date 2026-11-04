@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { ageFrom } from "@/lib/user";
+import { feedShowAnyWithMedia, HAS_MEDIA } from "@/lib/feedVisibility";
 import { VISIBLE_PROFILE } from "@/lib/moderation";
 import type { Prisma } from "@prisma/client";
 import { isMockSession, mockBrowse } from "@/lib/mock";
@@ -112,7 +113,9 @@ export async function GET(request: Request) {
   const commonFilters: Prisma.ProfileWhereInput[] = [
     VISIBLE_PROFILE,
     { role: "ESCORT" },
-    { subscriptionExpiresAt: { gt: new Date() } },
+    ...((await feedShowAnyWithMedia())
+      ? [HAS_MEDIA, { birthDate: { lte: birthDateForAge(18) } }]
+      : [{ subscriptionExpiresAt: { gt: new Date() } }]),
   ];
   if (country) commonFilters.push({ country: { equals: country, mode: "insensitive" } });
   if (state) commonFilters.push({ state: { equals: state, mode: "insensitive" } });

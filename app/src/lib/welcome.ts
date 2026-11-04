@@ -502,6 +502,7 @@ export async function welcomeNotice(userId: string) {
         email: true,
         bannedAt: true,
         welcomeNotifiedAt: true,
+        rewardPillDismissedAt: true,
         profile: { select: { gender: true } },
       },
     }),
@@ -509,6 +510,7 @@ export async function welcomeNotice(userId: string) {
     issuedCount(),
   ]);
   if (!user || user.bannedAt) return { show: false as const };
+  if (user.rewardPillDismissedAt) return { show: false as const };
   if (user.profile?.gender === "MALE") return { show: false as const };
   const active = reward && reward.status !== "VOID" && reward.status !== "WITHDRAWN";
   const open = settings.enabled && issued < settings.participantLimit;
@@ -530,8 +532,9 @@ export async function welcomeNotice(userId: string) {
     }
   }
 
-  let title = `${amountLabel} Welcome Reward`;
-  let body = `Finish verification, then refer ${settings.requiredReferrals} verified women. Signing up alone does not pay it.`;
+  const short = amountLabel.replace(/,000$/, "k");
+  const title = `${short} Reward`;
+  let body = "";
   if (reward?.status === "LOCKED") {
     body = `Your ${amountLabel} is locked. Refer ${settings.requiredReferrals} verified women to unlock it.`;
   } else if (reward?.status === "UNLOCKED") {
